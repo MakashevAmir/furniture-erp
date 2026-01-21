@@ -1,0 +1,499 @@
+@page "/orders"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@using MediatR
+@using FurnitureERP.Application.Orders.Queries.GetOrders
+@using FurnitureERP.Application.Orders.Commands.DeleteOrder
+@using FurnitureERP.Application.Orders.Commands.ConfirmOrder
+@using FurnitureERP.Application.Orders.Commands.CompleteOrder
+@using FurnitureERP.Application.Orders.Commands.CancelOrder
+@using FurnitureERP.Application.Orders.DTOs
+@using FurnitureERP.Domain.Aggregates.Orders
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Objednávky - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
+                Správa objednávek
+            </RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" class="rz-text-align-md-end">
+            <RadzenButton Icon="add_circle_outline"
+                          Text="Vytvořit objednávku"
+                          Click="@CreateOrder"
+                          ButtonStyle="ButtonStyle.Primary" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard>
+        <RadzenStack Gap="1rem" style="margin-bottom: 1rem;">
+            <RadzenRow AlignItems="AlignItems.Center">
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenLabel Text="Filtr podle stavu:" />
+                    <RadzenDropDown @bind-Value="@selectedStatus"
+                                    Data="@statusOptions"
+                                    AllowClear="true"
+                                    Placeholder="Všechny stavy"
+                                    Change="@(() => grid!.Reload())"
+                                    Style="width: 100%;"
+                                    TextProperty="Text"
+                                    ValueProperty="Value" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenLabel Text="Od data:" />
+                    <RadzenDatePicker @bind-Value="@dateFrom"
+                                      DateFormat="dd.MM.yyyy"
+                                      Change="@(() => grid!.Reload())"
+                                      Style="width: 100%;" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenLabel Text="Do data:" />
+                    <RadzenDatePicker @bind-Value="@dateTo"
+                                      DateFormat="dd.MM.yyyy"
+                                      Change="@(() => grid!.Reload())"
+                                      Style="width: 100%;" />
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenStack>
+
+        <RadzenDataGrid @ref="grid"
+                        Data="@orders"
+                        TItem="OrderDto"
+                        AllowFiltering="true"
+                        AllowSorting="true"
+                        AllowPaging="true"
+                        PageSize="20"
+                        FilterMode="FilterMode.Simple"
+                        IsLoading="@isLoading"
+                        LoadData="@LoadData">
+            <Columns>
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Property="OrderNumber"
+                                      Title="Číslo objednávky"
+                                      Width="150px" />
+
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Property="CustomerName"
+                                      Title="Zákazník"
+                                      Width="180px" />
+
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Property="OrderDate"
+                                      Title="Datum objednávky"
+                                      Width="150px"
+                                      Filterable="false">
+                    <Template Context="order">
+                        @order.OrderDate.ToString("dd.MM.yyyy")
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Property="ExpectedCompletionDate"
+                                      Title="Očekávané dokončení"
+                                      Width="170px"
+                                      Filterable="false">
+                    <Template Context="order">
+                        @(order.ExpectedCompletionDate?.ToString("dd.MM.yyyy") ?? "-")
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Property="Status"
+                                      Title="Stav"
+                                      Width="150px"
+                                      Filterable="false"
+                                      Sortable="false">
+                    <Template Context="order">
+                        <RadzenBadge BadgeStyle="@GetStatusBadgeStyle(order.Status)"
+                                     Text="@GetStatusText(order.Status)" />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Property="TotalAmount"
+                                      Title="Celková částka"
+                                      Width="150px"
+                                      Filterable="false">
+                    <Template Context="order">
+                        @order.TotalAmount.ToString("N2") Kč
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Title="Položky"
+                                      Width="100px"
+                                      Filterable="false"
+                                      Sortable="false">
+                    <Template Context="order">
+                        <RadzenText TextStyle="TextStyle.Body2">
+                            @order.OrderItems.Count ks
+                        </RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="OrderDto"
+                                      Title="Akce"
+                                      Width="250px"
+                                      Filterable="false"
+                                      Sortable="false">
+                    <Template Context="order">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Icon="visibility"
+                                          ButtonStyle="ButtonStyle.Info"
+                                          Size="ButtonSize.Small"
+                                          Click="@(() => ViewOrder(order.Id))"
+                                          title="Zobrazit" />
+                            @if (order.Status == OrderStatus.Pending)
+                            {
+                                <RadzenButton Icon="edit"
+                                              ButtonStyle="ButtonStyle.Light"
+                                              Size="ButtonSize.Small"
+                                              Click="@(() => EditOrder(order.Id))"
+                                              title="Upravit" />
+                                <RadzenButton Icon="check_circle"
+                                              ButtonStyle="ButtonStyle.Success"
+                                              Size="ButtonSize.Small"
+                                              Click="@(() => ConfirmOrderAction(order.Id))"
+                                              title="Potvrdit" />
+                            }
+                            @if (order.Status == OrderStatus.InProduction)
+                            {
+                                <RadzenButton Icon="done_all"
+                                              ButtonStyle="ButtonStyle.Success"
+                                              Size="ButtonSize.Small"
+                                              Click="@(() => CompleteOrderAction(order.Id))"
+                                              title="Dokončit" />
+                            }
+                            @if (order.Status == OrderStatus.Pending || order.Status == OrderStatus.InProduction)
+                            {
+                                <RadzenButton Icon="cancel"
+                                              ButtonStyle="ButtonStyle.Warning"
+                                              Size="ButtonSize.Small"
+                                              Click="@(() => CancelOrderAction(order.Id))"
+                                              title="Zrušit" />
+                            }
+                            @if (order.Status == OrderStatus.Pending)
+                            {
+                                <RadzenButton Icon="delete"
+                                              ButtonStyle="ButtonStyle.Danger"
+                                              Size="ButtonSize.Small"
+                                              Click="@(() => DeleteOrder(order.Id))"
+                                              title="Smazat" />
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private RadzenDataGrid<OrderDto>? grid;
+    private List<OrderDto> orders = new();
+    private List<OrderDto> allOrders = new();
+    private bool isLoading = false;
+    private OrderStatus? selectedStatus;
+    private DateTime? dateFrom;
+    private DateTime? dateTo;
+
+    private List<StatusOption> statusOptions = new()
+    {
+        new StatusOption { Value = OrderStatus.Pending, Text = "Čeká na potvrzení" },
+        new StatusOption { Value = OrderStatus.InProduction, Text = "Ve výrobě" },
+        new StatusOption { Value = OrderStatus.Completed, Text = "Dokončeno" },
+        new StatusOption { Value = OrderStatus.Delivered, Text = "Doručeno" },
+        new StatusOption { Value = OrderStatus.Cancelled, Text = "Zrušeno" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+        await LoadOrders();
+    }
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        try
+        {
+            isLoading = true;
+            var query = new GetOrdersQuery();
+            var result = await Mediator.Send(query);
+            allOrders = result.ToList();
+
+            // Apply filters
+            orders = allOrders;
+
+            if (selectedStatus.HasValue)
+            {
+                orders = orders.Where(o => o.Status == selectedStatus.Value).ToList();
+            }
+
+            if (dateFrom.HasValue)
+            {
+                orders = orders.Where(o => o.OrderDate.Date >= dateFrom.Value.Date).ToList();
+            }
+
+            if (dateTo.HasValue)
+            {
+                orders = orders.Where(o => o.OrderDate.Date <= dateTo.Value.Date).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst seznam objednávek: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateOrder()
+    {
+        var result = await DialogService.OpenAsync<OrderEditDialog>(
+            "Vytvořit objednávku",
+            new Dictionary<string, object> { },
+            new DialogOptions { Width = "900px", Height = "auto", Resizable = true, Draggable = true }
+        );
+
+        if (result == true)
+        {
+            await LoadOrders();
+            await grid!.Reload();
+        }
+    }
+
+    private async Task EditOrder(int orderId)
+    {
+        var result = await DialogService.OpenAsync<OrderEditDialog>(
+            "Upravit objednávku",
+            new Dictionary<string, object> { ["OrderId"] = orderId },
+            new DialogOptions { Width = "900px", Height = "auto", Resizable = true, Draggable = true }
+        );
+
+        if (result == true)
+        {
+            await LoadOrders();
+            await grid!.Reload();
+        }
+    }
+
+    private async Task ViewOrder(int orderId)
+    {
+        await DialogService.OpenAsync<OrderEditDialog>(
+            "Detail objednávky",
+            new Dictionary<string, object> { ["OrderId"] = orderId, ["IsReadOnly"] = true },
+            new DialogOptions { Width = "900px", Height = "auto", Resizable = true, Draggable = true }
+        );
+    }
+
+    private async Task ConfirmOrderAction(int orderId)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Opravdu chcete potvrdit tuto objednávku a zahájit výrobu?",
+            "Potvrzení objednávky",
+            new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
+        );
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var command = new ConfirmOrderCommand(orderId);
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Objednávka byla úspěšně potvrzena",
+                    Duration = 3000
+                });
+
+                await LoadOrders();
+                await grid!.Reload();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba potvrzení",
+                    Detail = $"Nepodařilo se potvrdit objednávku: {ex.Message}",
+                    Duration = 4000
+                });
+            }
+        }
+    }
+
+    private async Task CompleteOrderAction(int orderId)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Opravdu chcete označit tuto objednávku jako dokončenou?",
+            "Dokončení objednávky",
+            new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
+        );
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var command = new CompleteOrderCommand(orderId);
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Objednávka byla úspěšně dokončena",
+                    Duration = 3000
+                });
+
+                await LoadOrders();
+                await grid!.Reload();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba dokončení",
+                    Detail = $"Nepodařilo se dokončit objednávku: {ex.Message}",
+                    Duration = 4000
+                });
+            }
+        }
+    }
+
+    private async Task CancelOrderAction(int orderId)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Opravdu chcete zrušit tuto objednávku?",
+            "Zrušení objednávky",
+            new ConfirmOptions
+            {
+                OkButtonText = "Ano",
+                CancelButtonText = "Ne"
+            }
+        );
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var command = new CancelOrderCommand(orderId, "Zrušeno uživatelem");
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Objednávka byla úspěšně zrušena",
+                    Duration = 3000
+                });
+
+                await LoadOrders();
+                await grid!.Reload();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba zrušení",
+                    Detail = $"Nepodařilo se zrušit objednávku: {ex.Message}",
+                    Duration = 4000
+                });
+            }
+        }
+    }
+
+    private async Task DeleteOrder(int orderId)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Opravdu chcete smazat tuto objednávku? Tato akce je nevratná.",
+            "Potvrzení smazání",
+            new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
+        );
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var command = new DeleteOrderCommand(orderId);
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Objednávka byla úspěšně smazána",
+                    Duration = 3000
+                });
+
+                await LoadOrders();
+                await grid!.Reload();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba mazání",
+                    Detail = $"Nepodařilo se smazat objednávku: {ex.Message}",
+                    Duration = 4000
+                });
+            }
+        }
+    }
+
+    private BadgeStyle GetStatusBadgeStyle(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Pending => BadgeStyle.Warning,
+            OrderStatus.InProduction => BadgeStyle.Info,
+            OrderStatus.Completed => BadgeStyle.Success,
+            OrderStatus.Delivered => BadgeStyle.Primary,
+            OrderStatus.Cancelled => BadgeStyle.Danger,
+            _ => BadgeStyle.Light
+        };
+    }
+
+    private string GetStatusText(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Pending => "Čeká na potvrzení",
+            OrderStatus.InProduction => "Ve výrobě",
+            OrderStatus.Completed => "Dokončeno",
+            OrderStatus.Delivered => "Doručeno",
+            OrderStatus.Cancelled => "Zrušeno",
+            _ => "Neznámý"
+        };
+    }
+
+    private class StatusOption
+    {
+        public OrderStatus? Value { get; set; }
+        public string Text { get; set; } = string.Empty;
+    }
+}

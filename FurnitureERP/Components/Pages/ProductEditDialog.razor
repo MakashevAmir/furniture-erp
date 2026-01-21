@@ -1,0 +1,718 @@
+@using MediatR
+@using FurnitureERP.Application.Products.Queries.GetProductById
+@using FurnitureERP.Application.Products.Queries.GetProducts
+@using FurnitureERP.Application.Products.Commands.CreateProduct
+@using FurnitureERP.Application.Products.Commands.UpdateProduct
+@using FurnitureERP.Application.Materials.Queries.GetMaterials
+@using FurnitureERP.Application.Employees.Queries.GetEmployees
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenTemplateForm TItem="ProductFormModel" Data="@model" Submit="@OnSubmit">
+        <RadzenStack Gap="0.5rem">
+            <RadzenFormField Text="Název" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.Name" Name="Name" MaxLength="200" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Name" Text="Název je povinný" />
+                    <RadzenLengthValidator Component="Name" Max="200" Text="Maximální délka je 200 znaků" />
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Popis" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextArea @bind-Value="@model.Description" Name="Description" Rows="3" MaxLength="1000" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Description" Text="Popis je povinný" />
+                    <RadzenLengthValidator Component="Description" Max="1000" Text="Maximální délka je 1000 znaků" />
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Kategorie" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenDropDown @bind-Value="@model.Category"
+                                    Data="@categories"
+                                    Name="Category"
+                                    Change="@OnCategoryChanged"
+                                    AllowClear="false"
+                                    Placeholder="Vyberte kategorii" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Category" Text="Kategorie je povinná" />
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Kód výrobku" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.Article" Name="Article" MaxLength="50" Placeholder="ABC-123" ReadOnly="true" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-info-light">
+                        Kód se vygeneruje automaticky po výběru kategorie
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Nákladová cena (Kč)" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenNumeric @bind-Value="@model.BasePrice" Name="BasePrice" Min="0" TValue="decimal" ReadOnly="true" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-info-light">
+                        Automaticky vypočítáno z materiálů a práce
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Prodejní cena (Kč)" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenNumeric @bind-Value="@model.SalePrice" Name="SalePrice" Min="0" TValue="decimal" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="SalePrice" Text="Prodejní cena je povinná" />
+                    <RadzenNumericRangeValidator Component="SalePrice" Min="0.01"
+                                                  Text="Prodejní cena musí být větší než 0" />
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Stav" Variant="Variant.Outlined">
+                <RadzenSwitch @bind-Value="@model.IsActive" Name="IsActive" />
+                <RadzenLabel Text="@(model.IsActive ? "Aktivní" : "Neaktivní")"
+                             Style="margin-left: 0.5rem;" Component="IsActive" />
+            </RadzenFormField>
+
+            <RadzenCard style="margin-top: 1rem;">
+                <RadzenText TextStyle="TextStyle.H6">Materiály</RadzenText>
+                <RadzenRow Gap="0.5rem" style="margin-top: 0.5rem;">
+                    <RadzenColumn Size="12" SizeMD="5">
+                        <RadzenLabel Text="Materiál" />
+                        <RadzenDropDown @bind-Value="@selectedMaterialId"
+                                        Data="@materials"
+                                        TextProperty="Name"
+                                        ValueProperty="Id"
+                                        Placeholder="Vyberte materiál"
+                                        AllowClear="true"
+                                        AllowFiltering="true"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="2">
+                        <RadzenLabel Text="Množství" />
+                        <RadzenNumeric @bind-Value="@materialQuantity" Min="0.01m" TValue="decimal" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="2">
+                        <RadzenLabel Text="Odpad (%)" />
+                        <RadzenNumeric @bind-Value="@materialWastage" Min="0m" Max="100m" TValue="decimal" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="2">
+                        <RadzenLabel Text="Poznámka" />
+                        <RadzenTextBox @bind-Value="@materialNotes" MaxLength="200" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="1" style="display: flex; align-items: flex-end;">
+                        <RadzenButton Icon="add"
+                                      ButtonStyle="ButtonStyle.Success"
+                                      Click="@AddMaterial"
+                                      title="Přidat" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                @if (model.Materials.Any())
+                {
+                    <RadzenDataGrid Data="@model.Materials" TItem="MaterialBomFormModel" style="margin-top: 1rem;" AllowPaging="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="MaterialBomFormModel" Property="MaterialName" Title="Materiál" Width="250px" />
+                            <RadzenDataGridColumn TItem="MaterialBomFormModel" Property="Quantity" Title="Množství" Width="100px">
+                                <Template Context="item">
+                                    @item.Quantity.ToString("N2")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="MaterialBomFormModel" Property="Wastage" Title="Odpad %" Width="100px">
+                                <Template Context="item">
+                                    @item.Wastage.ToString("N1")%
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="MaterialBomFormModel" Property="Notes" Title="Poznámka" />
+                            <RadzenDataGridColumn TItem="MaterialBomFormModel" Title="Akce" Width="80px">
+                                <Template Context="item">
+                                    <RadzenButton Icon="delete"
+                                                  ButtonStyle="ButtonStyle.Danger"
+                                                  Size="ButtonSize.Small"
+                                                  Click="@(() => RemoveMaterial(item))"
+                                                  title="Odebrat" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+            </RadzenCard>
+
+            <RadzenCard style="margin-top: 1rem;">
+                <RadzenText TextStyle="TextStyle.H6">Pracovní operace</RadzenText>
+                <RadzenRow Gap="0.5rem" style="margin-top: 0.5rem;">
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenLabel Text="Zaměstnanec" />
+                        <RadzenDropDown @bind-Value="@selectedEmployeeId"
+                                        Data="@employees"
+                                        TextProperty="FullName"
+                                        ValueProperty="Id"
+                                        Placeholder="Vyberte zaměstnance"
+                                        AllowClear="true"
+                                        AllowFiltering="true"
+                                        Change="@OnEmployeeSelected"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        Style="width: 100%;" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenLabel Text="Pozice" />
+                        <RadzenTextBox @bind-Value="@laborPosition" MaxLength="100" Placeholder="Truhlář..." ReadOnly="@(selectedEmployeeId.HasValue)" Style="width: 100%;" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="2">
+                        <RadzenLabel Text="Hodiny" />
+                        <RadzenNumeric @bind-Value="@laborHours" Min="0.01m" TValue="decimal" Style="width: 100%;" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="2">
+                        <RadzenLabel Text="Popis" />
+                        <RadzenTextBox @bind-Value="@laborDescription" MaxLength="200" Style="width: 100%;" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="1" style="display: flex; align-items: flex-end;">
+                        <RadzenButton Icon="add"
+                                      ButtonStyle="ButtonStyle.Success"
+                                      Click="@AddLabor"
+                                      title="Přidat" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                @if (model.LaborOperations.Any())
+                {
+                    <RadzenDataGrid Data="@model.LaborOperations" TItem="LaborBomFormModel" style="margin-top: 1rem;" AllowPaging="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="LaborBomFormModel" Property="EmployeeName" Title="Zaměstnanec" Width="180px">
+                                <Template Context="item">
+                                    @(string.IsNullOrEmpty(item.EmployeeName) ? "-" : item.EmployeeName)
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="LaborBomFormModel" Property="Position" Title="Pozice" Width="150px" />
+                            <RadzenDataGridColumn TItem="LaborBomFormModel" Property="Hours" Title="Hodiny" Width="100px">
+                                <Template Context="item">
+                                    @item.Hours.ToString("N2")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="LaborBomFormModel" Property="Description" Title="Popis" />
+                            <RadzenDataGridColumn TItem="LaborBomFormModel" Title="Akce" Width="80px">
+                                <Template Context="item">
+                                    <RadzenButton Icon="delete"
+                                                  ButtonStyle="ButtonStyle.Danger"
+                                                  Size="ButtonSize.Small"
+                                                  Click="@(() => RemoveLabor(item))"
+                                                  title="Odebrat" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+            </RadzenCard>
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End" style="margin-top: 1rem;">
+            <RadzenButton ButtonType="ButtonType.Submit"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Text="Uložit"
+                          Icon="save"
+                          IsBusy="@isSaving" />
+            <RadzenButton ButtonType="ButtonType.Button"
+                          ButtonStyle="ButtonStyle.Light"
+                          Text="Zrušit"
+                          Icon="cancel"
+                          Click="@Cancel" />
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int? ProductId { get; set; }
+
+    private ProductFormModel model = new();
+    private bool isSaving = false;
+
+    private List<FurnitureERP.Application.Materials.DTOs.MaterialDto> materials = new();
+    private int? selectedMaterialId;
+    private decimal materialQuantity = 1;
+    private decimal materialWastage = 0;
+    private string materialNotes = string.Empty;
+
+    private List<FurnitureERP.Application.Employees.DTOs.EmployeeDto> employees = new();
+    private int? selectedEmployeeId;
+    private string laborPosition = string.Empty;
+    private decimal laborHours = 1;
+    private string laborDescription = string.Empty;
+
+    private List<string> categories = new()
+    {
+        "Stoly",
+        "Skříně",
+        "Židle",
+        "Postele",
+        "Komody",
+        "Regály",
+        "Ostatní"
+    };
+
+    private Dictionary<string, string> categoryPrefixes = new()
+    {
+        { "Stoly", "ST" },
+        { "Skříně", "SK" },
+        { "Židle", "ZI" },
+        { "Postele", "PO" },
+        { "Komody", "KO" },
+        { "Regály", "RE" },
+        { "Ostatní", "OS" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var materialsQuery = new GetMaterialsQuery();
+        materials = (await Mediator.Send(materialsQuery)).ToList();
+
+        var employeesQuery = new GetEmployeesQuery();
+        employees = (await Mediator.Send(employeesQuery)).ToList();
+
+        if (ProductId.HasValue)
+        {
+            await LoadProduct(ProductId.Value);
+        }
+        else
+        {
+            model.IsActive = true;
+        }
+    }
+
+    private async Task LoadProduct(int id)
+    {
+        try
+        {
+            var query = new GetProductByIdQuery(id);
+            var product = await Mediator.Send(query);
+
+            if (product != null)
+            {
+                model = new ProductFormModel
+                {
+                    Name = product.Name,
+                    Description = product.Description,
+                    Category = product.Category,
+                    Article = product.Article,
+                    BasePrice = product.BasePrice,
+                    SalePrice = product.SalePrice,
+                    IsActive = product.IsActive,
+                    Materials = product.MaterialBoms?.Select(mb => new MaterialBomFormModel
+                    {
+                        MaterialId = mb.MaterialId,
+                        MaterialName = mb.MaterialName,
+                        Quantity = mb.Quantity,
+                        Wastage = mb.WastagePercentage,
+                        Notes = mb.Notes
+                    }).ToList() ?? new(),
+                    LaborOperations = product.LaborBoms?.Select(lb => new LaborBomFormModel
+                    {
+                        Position = lb.Position,
+                        Hours = lb.Hours,
+                        Description = lb.Description
+                    }).ToList() ?? new()
+                };
+
+                CalculateBasePrice();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst výrobek: {ex.Message}",
+                Duration = 4000
+            });
+            DialogService.Close(false);
+        }
+    }
+
+    private async Task OnSubmit()
+    {
+        try
+        {
+            isSaving = true;
+
+            if (ProductId.HasValue)
+            {
+                var command = new UpdateProductCommand(
+                    ProductId.Value,
+                    model.Name,
+                    model.Description,
+                    model.Category,
+                    model.Article,
+                    model.BasePrice,
+                    model.SalePrice,
+                    model.IsActive,
+                    model.Materials.Select(m => new CreateMaterialBomDto(
+                        m.MaterialId,
+                        m.Quantity,
+                        m.Wastage,
+                        m.Notes
+                    )).ToList(),
+                    model.LaborOperations.Select(l => new CreateLaborBomDto(
+                        l.Position,
+                        l.Hours,
+                        l.Description
+                    )).ToList()
+                );
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Výrobek byl úspěšně aktualizován",
+                    Duration = 3000
+                });
+            }
+            else
+            {
+                var command = new CreateProductCommand(
+                    model.Name,
+                    model.Description,
+                    model.Category,
+                    model.Article,
+                    model.BasePrice,
+                    model.SalePrice,
+                    model.Materials.Select(m => new CreateMaterialBomDto(
+                        m.MaterialId,
+                        m.Quantity,
+                        m.Wastage,
+                        m.Notes
+                    )).ToList(),
+                    model.LaborOperations.Select(l => new CreateLaborBomDto(
+                        l.Position,
+                        l.Hours,
+                        l.Description
+                    )).ToList()
+                );
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Výrobek byl úspěšně vytvořen",
+                    Duration = 3000
+                });
+            }
+
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba ukládání",
+                Detail = $"Nepodařilo se uložit výrobek: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+
+    private async Task OnCategoryChanged()
+    {
+        if (!ProductId.HasValue && !string.IsNullOrEmpty(model.Category))
+        {
+            await GenerateArticleCode();
+        }
+    }
+
+    private async Task GenerateArticleCode()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(model.Category) || !categoryPrefixes.ContainsKey(model.Category))
+                return;
+
+            var prefix = categoryPrefixes[model.Category];
+
+            var query = new GetProductsQuery();
+            var allProducts = await Mediator.Send(query);
+
+            var existingCodes = allProducts
+                .Where(p => p.Article.StartsWith(prefix + "-"))
+                .Select(p => p.Article)
+                .ToList();
+
+            int nextNumber = 1;
+            if (existingCodes.Any())
+            {
+                var maxNumber = existingCodes
+                    .Select(code =>
+                    {
+                        var parts = code.Split('-');
+                        return parts.Length == 2 && int.TryParse(parts[1], out int num) ? num : 0;
+                    })
+                    .DefaultIfEmpty(0)
+                    .Max();
+
+                nextNumber = maxNumber + 1;
+            }
+
+            model.Article = $"{prefix}-{nextNumber:D3}";
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = $"Nepodařilo se vygenerovat kód: {ex.Message}",
+                Duration = 3000
+            });
+        }
+    }
+
+    private void AddMaterial()
+    {
+        if (!selectedMaterialId.HasValue)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Vyberte materiál",
+                Duration = 2000
+            });
+            return;
+        }
+
+        if (materialQuantity <= 0)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Množství musí být větší než 0",
+                Duration = 2000
+            });
+            return;
+        }
+
+        if (model.Materials.Any(m => m.MaterialId == selectedMaterialId.Value))
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Tento materiál již byl přidán",
+                Duration = 2000
+            });
+            return;
+        }
+
+        var material = materials.FirstOrDefault(m => m.Id == selectedMaterialId.Value);
+        if (material != null)
+        {
+            model.Materials.Add(new MaterialBomFormModel
+            {
+                MaterialId = material.Id,
+                MaterialName = material.Name,
+                Quantity = materialQuantity,
+                Wastage = materialWastage,
+                Notes = materialNotes
+            });
+
+            selectedMaterialId = null;
+            materialQuantity = 1;
+            materialWastage = 0;
+            materialNotes = string.Empty;
+
+            model.Materials = new List<MaterialBomFormModel>(model.Materials);
+            CalculateBasePrice();
+        }
+    }
+
+    private void RemoveMaterial(MaterialBomFormModel material)
+    {
+        model.Materials.Remove(material);
+        model.Materials = new List<MaterialBomFormModel>(model.Materials);
+        CalculateBasePrice();
+    }
+
+    private void OnEmployeeSelected()
+    {
+        if (selectedEmployeeId.HasValue)
+        {
+            var employee = employees.FirstOrDefault(e => e.Id == selectedEmployeeId.Value);
+            if (employee != null)
+            {
+                laborPosition = employee.Position;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            laborPosition = string.Empty;
+        }
+    }
+
+    private void AddLabor()
+    {
+        if (string.IsNullOrWhiteSpace(laborPosition))
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Zadejte pozici pracovníka nebo vyberte zaměstnance",
+                Duration = 2000
+            });
+            return;
+        }
+
+        if (laborHours <= 0)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Počet hodin musí být větší než 0",
+                Duration = 2000
+            });
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(laborDescription))
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Popis práce je povinný",
+                Duration = 2000
+            });
+            return;
+        }
+
+        if (selectedEmployeeId.HasValue && model.LaborOperations.Any(l => l.EmployeeId == selectedEmployeeId.Value))
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Tento zaměstnanec již byl přidán",
+                Duration = 2000
+            });
+            return;
+        }
+
+        var employeeName = selectedEmployeeId.HasValue
+            ? employees.FirstOrDefault(e => e.Id == selectedEmployeeId.Value)?.FullName ?? ""
+            : "";
+
+        model.LaborOperations.Add(new LaborBomFormModel
+        {
+            EmployeeId = selectedEmployeeId,
+            EmployeeName = employeeName,
+            Position = laborPosition,
+            Hours = laborHours,
+            Description = laborDescription
+        });
+
+        selectedEmployeeId = null;
+        laborPosition = string.Empty;
+        laborHours = 1;
+        laborDescription = string.Empty;
+
+        model.LaborOperations = new List<LaborBomFormModel>(model.LaborOperations);
+        CalculateBasePrice();
+    }
+
+    private void RemoveLabor(LaborBomFormModel labor)
+    {
+        model.LaborOperations.Remove(labor);
+        model.LaborOperations = new List<LaborBomFormModel>(model.LaborOperations);
+        CalculateBasePrice();
+    }
+
+    private void CalculateBasePrice()
+    {
+        decimal totalMaterialCost = 0;
+        decimal totalLaborCost = 0;
+
+        foreach (var mat in model.Materials)
+        {
+            var material = materials.FirstOrDefault(m => m.Id == mat.MaterialId);
+            if (material != null)
+            {
+                var quantityWithWastage = mat.Quantity * (1 + mat.Wastage / 100m);
+                totalMaterialCost += quantityWithWastage * material.PricePerUnit;
+            }
+        }
+
+        foreach (var labor in model.LaborOperations)
+        {
+            var employee = labor.EmployeeId.HasValue
+                ? employees.FirstOrDefault(e => e.Id == labor.EmployeeId.Value)
+                : null;
+            var hourlyRate = employee?.HourlyRate ?? 300m;
+            totalLaborCost += labor.Hours * hourlyRate;
+        }
+
+        model.BasePrice = totalMaterialCost + totalLaborCost;
+
+        if (!ProductId.HasValue || model.SalePrice == 0)
+        {
+            model.SalePrice = Math.Ceiling(model.BasePrice * 1.35m / 10) * 10;
+        }
+
+        StateHasChanged();
+    }
+
+    private class ProductFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Article { get; set; } = string.Empty;
+        public decimal BasePrice { get; set; }
+        public decimal SalePrice { get; set; }
+        public bool IsActive { get; set; }
+        public List<MaterialBomFormModel> Materials { get; set; } = new();
+        public List<LaborBomFormModel> LaborOperations { get; set; } = new();
+    }
+
+    private class MaterialBomFormModel
+    {
+        public int MaterialId { get; set; }
+        public string MaterialName { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public decimal Wastage { get; set; }
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    private class LaborBomFormModel
+    {
+        public int? EmployeeId { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public decimal Hours { get; set; }
+        public string Description { get; set; } = string.Empty;
+    }
+}

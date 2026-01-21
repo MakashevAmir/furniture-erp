@@ -1,0 +1,219 @@
+@page "/products"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@using MediatR
+@using FurnitureERP.Application.Products.DTOs
+@using FurnitureERP.Application.Products.Queries.GetProducts
+@using FurnitureERP.Application.Products.Commands.CreateProduct
+@using FurnitureERP.Application.Products.Commands.UpdateProduct
+@using FurnitureERP.Application.Products.Commands.DeleteProduct
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Výrobky - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
+                Správa výrobků
+            </RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" class="rz-text-align-md-end">
+            <RadzenButton Icon="add_circle_outline"
+                          Text="Vytvořit výrobek"
+                          Click="@CreateProduct"
+                          ButtonStyle="ButtonStyle.Primary" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard>
+        <RadzenDataGrid @ref="grid"
+                        Data="@products"
+                        TItem="ProductDto"
+                        AllowFiltering="true"
+                        AllowSorting="true"
+                        AllowPaging="true"
+                        PageSize="10"
+                        FilterMode="FilterMode.Simple"
+                        IsLoading="@isLoading"
+                        LoadData="@LoadData">
+            <Columns>
+                <RadzenDataGridColumn TItem="ProductDto"
+                                      Property="Article"
+                                      Title="Kód"
+                                      Width="120px" />
+
+                <RadzenDataGridColumn TItem="ProductDto"
+                                      Property="Name"
+                                      Title="Název"
+                                      Width="200px" />
+
+                <RadzenDataGridColumn TItem="ProductDto"
+                                      Property="Description"
+                                      Title="Popis" />
+
+                <RadzenDataGridColumn TItem="ProductDto"
+                                      Property="Category"
+                                      Title="Kategorie"
+                                      Width="150px" />
+
+                <RadzenDataGridColumn TItem="ProductDto"
+                                      Property="SalePrice"
+                                      Title="Prodejní cena"
+                                      Width="140px"
+                                      FormatString="{0:C2}">
+                    <Template Context="product">
+                        @product.SalePrice.ToString("N2") Kč
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="ProductDto"
+                                      Property="IsActive"
+                                      Title="Stav"
+                                      Width="100px"
+                                      Filterable="false"
+                                      Sortable="false">
+                    <Template Context="product">
+                        <RadzenBadge BadgeStyle="@(product.IsActive ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                     Text="@(product.IsActive ? "Aktivní" : "Neaktivní")" />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="ProductDto"
+                                      Title="Akce"
+                                      Width="180px"
+                                      Filterable="false"
+                                      Sortable="false">
+                    <Template Context="product">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Icon="edit"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small"
+                                          Click="@(() => EditProduct(product.Id))"
+                                          title="Upravit" />
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Size="ButtonSize.Small"
+                                          Click="@(() => DeleteProduct(product.Id))"
+                                          title="Smazat" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private RadzenDataGrid<ProductDto>? grid;
+    private List<ProductDto> products = new();
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+        await LoadProducts();
+    }
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            isLoading = true;
+            var query = new GetProductsQuery();
+            var result = await Mediator.Send(query);
+            products = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst seznam výrobků: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateProduct()
+    {
+        var result = await DialogService.OpenAsync<ProductEditDialog>(
+            "Vytvořit výrobek",
+            new Dictionary<string, object> { },
+            new DialogOptions { Width = "700px", Height = "auto", Resizable = true, Draggable = true }
+        );
+
+        if (result == true)
+        {
+            await LoadProducts();
+            await grid!.Reload();
+        }
+    }
+
+    private async Task EditProduct(int productId)
+    {
+        var result = await DialogService.OpenAsync<ProductEditDialog>(
+            "Upravit výrobek",
+            new Dictionary<string, object> { ["ProductId"] = productId },
+            new DialogOptions { Width = "700px", Height = "auto", Resizable = true, Draggable = true }
+        );
+
+        if (result == true)
+        {
+            await LoadProducts();
+            await grid!.Reload();
+        }
+    }
+
+    private async Task DeleteProduct(int productId)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Opravdu chcete smazat tento výrobek?",
+            "Potvrzení smazání",
+            new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
+        );
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var command = new DeleteProductCommand(productId);
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Výrobek byl úspěšně smazán",
+                    Duration = 3000
+                });
+
+                await LoadProducts();
+                await grid!.Reload();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba mazání",
+                    Detail = $"Nepodařilo se smazat výrobek: {ex.Message}",
+                    Duration = 4000
+                });
+            }
+        }
+    }
+}

@@ -1,0 +1,283 @@
+@page "/materials"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@using MediatR
+@using FurnitureERP.Application.Materials.Queries.GetMaterials
+@using FurnitureERP.Application.Materials.Commands.DeleteMaterial
+@using FurnitureERP.Application.Materials.DTOs
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Materiály - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
+                Správa materiálů
+            </RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" class="rz-text-align-md-end">
+            <RadzenButton Icon="add_circle_outline"
+                          Text="Vytvořit materiál"
+                          Click="@CreateMaterial"
+                          ButtonStyle="ButtonStyle.Primary" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard>
+        <RadzenDataGrid @ref="grid"
+                        Data="@materials"
+                        TItem="MaterialDto"
+                        AllowFiltering="true"
+                        AllowSorting="true"
+                        AllowPaging="true"
+                        PageSize="20"
+                        FilterMode="FilterMode.Simple"
+                        IsLoading="@isLoading"
+                        LoadData="@LoadData"
+                        RowRender="@OnRowRender">
+            <Columns>
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="Name"
+                                      Title="Název"
+                                      Width="200px" />
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="Category"
+                                      Title="Kategorie"
+                                      Width="150px">
+                    <FilterTemplate>
+                        <RadzenDropDown @bind-Value="@selectedCategory"
+                                        Data="@categories"
+                                        AllowClear="true"
+                                        Placeholder="Všechny kategorie"
+                                        Change="@(() => grid!.Reload())"
+                                        Style="width: 100%;" />
+                    </FilterTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="Unit"
+                                      Title="Jednotka"
+                                      Width="100px"
+                                      Filterable="false" />
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="PricePerUnit"
+                                      Title="Cena/jedn."
+                                      Width="120px"
+                                      FormatString="{0:C2}">
+                    <Template Context="material">
+                        @material.PricePerUnit.ToString("N2") Kč
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="CurrentStock"
+                                      Title="Skladem"
+                                      Width="120px">
+                    <Template Context="material">
+                        <span style="@GetStockStyle(material)">
+                            @material.CurrentStock.ToString("N2") @material.Unit
+                        </span>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="MinimumStock"
+                                      Title="Min. zásoba"
+                                      Width="120px"
+                                      Filterable="false">
+                    <Template Context="material">
+                        @material.MinimumStock.ToString("N2") @material.Unit
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="Supplier"
+                                      Title="Dodavatel"
+                                      Width="150px" />
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Property="IsActive"
+                                      Title="Stav"
+                                      Width="100px"
+                                      Filterable="false"
+                                      Sortable="false">
+                    <Template Context="material">
+                        <RadzenBadge BadgeStyle="@(material.IsActive ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                     Text="@(material.IsActive ? "Aktivní" : "Neaktivní")" />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="MaterialDto"
+                                      Title="Akce"
+                                      Width="180px"
+                                      Filterable="false"
+                                      Sortable="false">
+                    <Template Context="material">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Icon="edit"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small"
+                                          Click="@(() => EditMaterial(material.Id))"
+                                          title="Upravit" />
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Size="ButtonSize.Small"
+                                          Click="@(() => DeleteMaterial(material.Id))"
+                                          title="Smazat" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private RadzenDataGrid<MaterialDto>? grid;
+    private List<MaterialDto> materials = new();
+    private List<MaterialDto> allMaterials = new();
+    private bool isLoading = false;
+    private string? selectedCategory;
+    private List<string> categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+        await LoadMaterials();
+    }
+
+    private async Task LoadData(LoadDataArgs args)
+    {
+        await LoadMaterials();
+    }
+
+    private async Task LoadMaterials()
+    {
+        try
+        {
+            isLoading = true;
+            var query = new GetMaterialsQuery();
+            var result = await Mediator.Send(query);
+            allMaterials = result.ToList();
+
+            // Extract unique categories for filter
+            categories = allMaterials
+                .Select(m => m.Category)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+
+            // Apply category filter if selected
+            materials = string.IsNullOrEmpty(selectedCategory)
+                ? allMaterials
+                : allMaterials.Where(m => m.Category == selectedCategory).ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst seznam materiálů: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateMaterial()
+    {
+        var result = await DialogService.OpenAsync<MaterialEditDialog>(
+            "Vytvořit materiál",
+            new Dictionary<string, object> { },
+            new DialogOptions { Width = "700px", Height = "auto", Resizable = true, Draggable = true }
+        );
+
+        if (result == true)
+        {
+            await LoadMaterials();
+            await grid!.Reload();
+        }
+    }
+
+    private async Task EditMaterial(int materialId)
+    {
+        var result = await DialogService.OpenAsync<MaterialEditDialog>(
+            "Upravit materiál",
+            new Dictionary<string, object> { ["MaterialId"] = materialId },
+            new DialogOptions { Width = "700px", Height = "auto", Resizable = true, Draggable = true }
+        );
+
+        if (result == true)
+        {
+            await LoadMaterials();
+            await grid!.Reload();
+        }
+    }
+
+    private async Task DeleteMaterial(int materialId)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Opravdu chcete smazat tento materiál?",
+            "Potvrzení smazání",
+            new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
+        );
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var command = new DeleteMaterialCommand(materialId);
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Materiál byl úspěšně smazán",
+                    Duration = 3000
+                });
+
+                await LoadMaterials();
+                await grid!.Reload();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba mazání",
+                    Detail = $"Nepodařilo se smazat materiál: {ex.Message}",
+                    Duration = 4000
+                });
+            }
+        }
+    }
+
+    private void OnRowRender(RowRenderEventArgs<MaterialDto> args)
+    {
+        // Highlight rows with low stock in light red
+        if (args.Data.CurrentStock < args.Data.MinimumStock)
+        {
+            args.Attributes.Add("style", "background-color: #ffe6e6;");
+        }
+    }
+
+    private string GetStockStyle(MaterialDto material)
+    {
+        if (material.CurrentStock < material.MinimumStock)
+        {
+            return "color: #d32f2f; font-weight: bold;";
+        }
+        return string.Empty;
+    }
+}

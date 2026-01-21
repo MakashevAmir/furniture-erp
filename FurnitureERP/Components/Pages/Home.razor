@@ -1,0 +1,374 @@
+@page "/"
+@using FurnitureERP.Application.Orders.Queries.GetOrders
+@using FurnitureERP.Application.Orders.Queries.GetActiveOrders
+@using FurnitureERP.Application.Materials.Queries.GetLowStockMaterials
+@using FurnitureERP.Application.Orders.DTOs
+@using FurnitureERP.Application.Materials.DTOs
+@using FurnitureERP.Domain.Aggregates.Orders
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IMediator Mediator
+
+<PageTitle>Dashboard - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1.5rem">
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">
+        Dashboard - Přehled systému
+    </RadzenText>
+
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="true" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Large">
+            <Template>Načítání...</Template>
+        </RadzenProgressBarCircular>
+    }
+    else
+    {
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; height: 100%;">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                            Celkem objednávek
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                            @totalOrders
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                            Za posledních 30 dní
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; height: 100%;">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                            Aktivní objednávky
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                            @activeOrders
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                            Čekající a ve výrobě
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; height: 100%;">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                            Tržby (30 dní)
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                            @totalRevenue.ToString("N0") Kč
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                            Z @completedOrders dokončených
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+                <RadzenCard Style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; height: 100%;">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                            Nízké zásoby
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                            @lowStockCount
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                            Materiálů pod minimem
+                        </RadzenText>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeLG="8">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H5" Style="font-weight: bold;">
+                            Aktivní objednávky
+                        </RadzenText>
+
+                        @if (recentActiveOrders.Any())
+                        {
+                            <RadzenDataList WrapItems="false" AllowPaging="false"
+                                            Data="@recentActiveOrders" TItem="OrderDto">
+                                <Template Context="order">
+                                    <RadzenCard Style="margin-bottom: 0.5rem; padding: 1rem;">
+                                        <RadzenRow>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenStack Gap="0.25rem">
+                                                    <RadzenText TextStyle="TextStyle.Overline" Style="color: var(--rz-text-secondary-color);">
+                                                        Číslo objednávky
+                                                    </RadzenText>
+                                                    <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-weight: bold;">
+                                                        @order.OrderNumber
+                                                    </RadzenText>
+                                                </RadzenStack>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenStack Gap="0.25rem">
+                                                    <RadzenText TextStyle="TextStyle.Overline" Style="color: var(--rz-text-secondary-color);">
+                                                        Zákazník
+                                                    </RadzenText>
+                                                    <RadzenText TextStyle="TextStyle.Body1">
+                                                        @order.CustomerName
+                                                    </RadzenText>
+                                                </RadzenStack>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenStack Gap="0.25rem" AlignItems="AlignItems.End">
+                                                    <RadzenBadge Text="@GetStatusText(order.Status)"
+                                                                 BadgeStyle="@GetStatusBadgeStyle(order.Status)"
+                                                                 Style="font-size: 0.875rem;" />
+                                                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: bold;">
+                                                        @order.TotalAmount.ToString("N0") Kč
+                                                    </RadzenText>
+                                                </RadzenStack>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                    </RadzenCard>
+                                </Template>
+                            </RadzenDataList>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Lighter">
+                                Žádné aktivní objednávky
+                            </RadzenAlert>
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="12" SizeLG="4">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H5" Style="font-weight: bold; color: var(--rz-danger);">
+                            ⚠️ Nízké zásoby
+                        </RadzenText>
+
+                        @if (lowStockMaterials.Any())
+                        {
+                            <RadzenDataList WrapItems="false" AllowPaging="false"
+                                            Data="@lowStockMaterials" TItem="MaterialDto">
+                                <Template Context="material">
+                                    <RadzenCard Style="margin-bottom: 0.5rem; padding: 0.75rem; background-color: var(--rz-danger-lighter);">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Body1" Style="font-weight: bold;">
+                                                @material.Name
+                                            </RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--rz-text-secondary-color);">
+                                                @material.Category
+                                            </RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-danger);">
+                                                Skladem: @material.CurrentStock.ToString("N2") @material.Unit
+                                                (Min: @material.MinimumStock.ToString("N2"))
+                                            </RadzenText>
+                                        </RadzenStack>
+                                    </RadzenCard>
+                                </Template>
+                            </RadzenDataList>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Lighter">
+                                Všechny materiály jsou nad minimální úrovní
+                            </RadzenAlert>
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H5" Style="font-weight: bold;">
+                            Rozdělení objednávek podle stavu (30 dní)
+                        </RadzenText>
+
+                        <RadzenRow Gap="1rem">
+                            <RadzenColumn Size="12" SizeMD="6" SizeLG="2">
+                                <RadzenCard Style="text-align: center; background-color: var(--rz-warning-lighter); padding: 1.5rem;">
+                                    <RadzenStack Gap="0.5rem">
+                                        <RadzenText TextStyle="TextStyle.H4" Style="font-weight: bold; color: var(--rz-warning);">
+                                            @pendingCount
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            Čekající
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6" SizeLG="2">
+                                <RadzenCard Style="text-align: center; background-color: var(--rz-info-lighter); padding: 1.5rem;">
+                                    <RadzenStack Gap="0.5rem">
+                                        <RadzenText TextStyle="TextStyle.H4" Style="font-weight: bold; color: var(--rz-info);">
+                                            @inProductionCount
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            Ve výrobě
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6" SizeLG="2">
+                                <RadzenCard Style="text-align: center; background-color: var(--rz-success-lighter); padding: 1.5rem;">
+                                    <RadzenStack Gap="0.5rem">
+                                        <RadzenText TextStyle="TextStyle.H4" Style="font-weight: bold; color: var(--rz-success);">
+                                            @completedCount
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            Dokončeno
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6" SizeLG="2">
+                                <RadzenCard Style="text-align: center; background-color: var(--rz-primary-lighter); padding: 1.5rem;">
+                                    <RadzenStack Gap="0.5rem">
+                                        <RadzenText TextStyle="TextStyle.H4" Style="font-weight: bold; color: var(--rz-primary);">
+                                            @deliveredCount
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            Doručeno
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6" SizeLG="2">
+                                <RadzenCard Style="text-align: center; background-color: var(--rz-danger-lighter); padding: 1.5rem;">
+                                    <RadzenStack Gap="0.5rem">
+                                        <RadzenText TextStyle="TextStyle.H4" Style="font-weight: bold; color: var(--rz-danger);">
+                                            @cancelledCount
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            Zrušeno
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </RadzenColumn>
+                        </RadzenRow>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    }
+</RadzenStack>
+
+@code {
+    private bool isLoading = true;
+
+    // Statistics
+    private int totalOrders = 0;
+    private int activeOrders = 0;
+    private int completedOrders = 0;
+    private decimal totalRevenue = 0;
+    private int lowStockCount = 0;
+
+    // Status counts
+    private int pendingCount = 0;
+    private int inProductionCount = 0;
+    private int completedCount = 0;
+    private int deliveredCount = 0;
+    private int cancelledCount = 0;
+
+    // Data
+    private List<OrderDto> recentActiveOrders = new();
+    private List<MaterialDto> lowStockMaterials = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        isLoading = true;
+        try
+        {
+            // Load all orders
+            var allOrdersQuery = new GetOrdersQuery();
+            var allOrders = await Mediator.Send(allOrdersQuery);
+
+            // Filter orders from last 30 days
+            var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+            var recentOrders = allOrders
+                .Where(o => o.OrderDate >= thirtyDaysAgo)
+                .ToList();
+
+            // Calculate statistics
+            totalOrders = recentOrders.Count;
+            activeOrders = recentOrders.Count(o => o.Status == OrderStatus.Pending || o.Status == OrderStatus.InProduction);
+            completedOrders = recentOrders.Count(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered);
+            totalRevenue = recentOrders
+                .Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered)
+                .Sum(o => o.TotalAmount);
+
+            // Status counts
+            pendingCount = recentOrders.Count(o => o.Status == OrderStatus.Pending);
+            inProductionCount = recentOrders.Count(o => o.Status == OrderStatus.InProduction);
+            completedCount = recentOrders.Count(o => o.Status == OrderStatus.Completed);
+            deliveredCount = recentOrders.Count(o => o.Status == OrderStatus.Delivered);
+            cancelledCount = recentOrders.Count(o => o.Status == OrderStatus.Cancelled);
+
+            // Load active orders (top 5)
+            var activeOrdersQuery = new GetActiveOrdersQuery();
+            var activeOrdersList = await Mediator.Send(activeOrdersQuery);
+            recentActiveOrders = activeOrdersList
+                .OrderByDescending(o => o.OrderDate)
+                .Take(5)
+                .ToList();
+
+            // Load low stock materials
+            var lowStockQuery = new GetLowStockMaterialsQuery();
+            var lowStock = await Mediator.Send(lowStockQuery);
+            lowStockMaterials = lowStock.ToList();
+            lowStockCount = lowStockMaterials.Count;
+        }
+        catch
+        {
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusText(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Pending => "Čeká na potvrzení",
+            OrderStatus.InProduction => "Ve výrobě",
+            OrderStatus.Completed => "Dokončeno",
+            OrderStatus.Delivered => "Doručeno",
+            OrderStatus.Cancelled => "Zrušeno",
+            _ => "Neznámý"
+        };
+    }
+
+    private BadgeStyle GetStatusBadgeStyle(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Pending => BadgeStyle.Warning,
+            OrderStatus.InProduction => BadgeStyle.Info,
+            OrderStatus.Completed => BadgeStyle.Success,
+            OrderStatus.Delivered => BadgeStyle.Primary,
+            OrderStatus.Cancelled => BadgeStyle.Danger,
+            _ => BadgeStyle.Light
+        };
+    }
+}

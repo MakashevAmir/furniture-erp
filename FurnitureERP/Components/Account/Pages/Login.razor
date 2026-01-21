@@ -1,0 +1,211 @@
+@page "/Account/Login"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using FurnitureERP.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Přihlášení - FurnitureERP</PageTitle>
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-logo">
+                <RadzenIcon Icon="factory" Style="font-size: 3rem; color: #667eea;" />
+            </div>
+            <h1>FurnitureERP</h1>
+            <p class="login-subtitle">Systém pro správu nábytkové výroby</p>
+        </div>
+
+        <div class="login-form">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" AllowClose="false" Style="margin-bottom: 1rem;">
+                    @errorMessage
+                </RadzenAlert>
+            }
+
+            <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <RadzenFormField Text="Uživatelské jméno nebo e-mail" Variant="Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="Input.Email" Name="Input.Email" Style="width: 100%;" AutoComplete="username" />
+                        </ChildContent>
+                        <Start>
+                            <RadzenIcon Icon="person" />
+                        </Start>
+                    </RadzenFormField>
+                    <ValidationMessage For="() => Input.Email" class="validation-message" />
+                </div>
+
+                <div class="form-group">
+                    <RadzenFormField Text="Heslo" Variant="Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenPassword @bind-Value="Input.Password" Name="Input.Password" Style="width: 100%;" AutoComplete="current-password" />
+                        </ChildContent>
+                        <Start>
+                            <RadzenIcon Icon="lock" />
+                        </Start>
+                    </RadzenFormField>
+                    <ValidationMessage For="() => Input.Password" class="validation-message" />
+                </div>
+
+                <RadzenButton ButtonType="ButtonType.Submit"
+                            Text="Přihlásit se"
+                            Icon="login"
+                            ButtonStyle="ButtonStyle.Primary"
+                            Style="width: 100%; padding: 1rem; font-size: 1rem;" />
+            </EditForm>
+
+        </div>
+
+        <div class="login-footer">
+            <p>Výchozí přihlašovací údaje: <strong>admin</strong> / <strong>admin</strong></p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+    }
+
+    .login-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        width: 100%;
+        max-width: 420px;
+        overflow: hidden;
+    }
+
+    .login-header {
+        background: linear-gradient(135deg, #1e1e2d 0%, #2d2d44 100%);
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .login-logo {
+        margin-bottom: 1rem;
+    }
+
+    .login-header h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 700;
+    }
+
+    .login-subtitle {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.8;
+        font-size: 0.9rem;
+    }
+
+    .login-form {
+        padding: 2rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .validation-message {
+        color: var(--rz-danger);
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
+    .login-footer {
+        background: #f8f9fa;
+        padding: 1rem 2rem;
+        text-align: center;
+        border-top: 1px solid #eee;
+    }
+
+    .login-footer p {
+        margin: 0;
+        color: #666;
+        font-size: 0.85rem;
+    }
+
+    .login-footer strong {
+        color: #333;
+    }
+</style>
+
+@code {
+    private string? errorMessage;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        Input ??= new();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+    }
+
+    public async Task LoginUser()
+    {
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, false, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("Uživatel přihlášen.");
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.RequiresTwoFactor)
+        {
+            RedirectManager.RedirectTo(
+                "Account/LoginWith2fa",
+                new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = false });
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("Účet uživatele je uzamčen.");
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            errorMessage = "Neplatné přihlašovací údaje. Zkontrolujte uživatelské jméno a heslo.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Uživatelské jméno je povinné")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Heslo je povinné")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+    }
+}

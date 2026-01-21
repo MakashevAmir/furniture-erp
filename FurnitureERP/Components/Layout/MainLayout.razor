@@ -1,0 +1,63 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+
+<AuthorizeView>
+    <Authorized>
+        <RadzenLayout>
+            <RadzenHeader>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0">
+                        <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" Style="color: white;" />
+                        <RadzenLabel Text="FurnitureERP" Style="font-size: 1.5rem; font-weight: bold; margin-left: 1rem; color: white;" />
+                    </RadzenStack>
+
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Style="margin-right: 1rem;">
+                        <RadzenIcon Icon="person" Style="color: rgba(255,255,255,0.8);" />
+                        <RadzenLabel Text="@context.User.Identity?.Name" Style="font-weight: 500; color: white;" />
+                        <form action="Account/Logout" method="post">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="/" />
+                            <RadzenButton ButtonType="ButtonType.Submit"
+                                        Icon="logout"
+                                        Text="Odhlásit se"
+                                        ButtonStyle="ButtonStyle.Light"
+                                        Size="ButtonSize.Small" />
+                        </form>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenHeader>
+            <RadzenSidebar @bind-Expanded="@sidebarExpanded" Style="background: #1e1e2d;">
+                <RadzenPanelMenu Style="background: transparent;">
+                    <RadzenPanelMenuItem Text="Přehled" Icon="dashboard" Path="/" />
+                    <RadzenPanelMenuItem Text="Produkty" Icon="inventory_2" Path="/products" />
+                    <RadzenPanelMenuItem Text="Materiály" Icon="category" Path="/materials" />
+                    <RadzenPanelMenuItem Text="Objednávky" Icon="shopping_cart" Path="/orders" />
+                    <RadzenPanelMenuItem Text="Zaměstnanci" Icon="people" Path="/employees" />
+                </RadzenPanelMenu>
+            </RadzenSidebar>
+            <RadzenBody>
+                <div class="rz-p-4">
+                    @Body
+                </div>
+            </RadzenBody>
+        </RadzenLayout>
+    </Authorized>
+    <NotAuthorized>
+        <div class="login-layout">
+            @Body
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+<RadzenComponents />
+
+<div id="blazor-error-ui">
+    Došlo k neošetřené chybě.
+    <a href="" class="reload">Obnovit</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private bool sidebarExpanded = true;
+}

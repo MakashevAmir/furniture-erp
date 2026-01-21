@@ -1,0 +1,271 @@
+@using MediatR
+@using FurnitureERP.Application.Materials.Queries.GetMaterialById
+@using FurnitureERP.Application.Materials.Commands.CreateMaterial
+@using FurnitureERP.Application.Materials.Commands.UpdateMaterial
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenTemplateForm TItem="MaterialFormModel" Data="@model" Submit="@OnSubmit">
+        <RadzenStack Gap="0.5rem">
+            <RadzenFormField Text="Název" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.Name" Name="Name" MaxLength="200" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Name" Text="Název je povinný" />
+                    <RadzenLengthValidator Component="Name" Max="200" Text="Maximální délka 200 znaků" />
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Popis" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextArea @bind-Value="@model.Description" Name="Description" Rows="3" MaxLength="1000" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Description" Text="Popis je povinný" />
+                    <RadzenLengthValidator Component="Description" Max="1000" Text="Maximální délka 1000 znaků" />
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenRow>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Kategorie" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="@model.Category" Name="Category" MaxLength="100" Placeholder="Dřevo, Kování..." />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="Category" Text="Kategorie je povinná" />
+                            <RadzenLengthValidator Component="Category" Max="100" Text="Maximum 100 znaků" />
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Měrná jednotka" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="@model.Unit" Name="Unit" MaxLength="20" Placeholder="m, kg, ks..." />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="Unit" Text="Měrná jednotka je povinná" />
+                            <RadzenLengthValidator Component="Unit" Max="20" Text="Maximum 20 znaků" />
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenFormField Text="Cena za jednotku (Kč)" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="@model.PricePerUnit" Name="PricePerUnit" Min="0" TValue="decimal" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="PricePerUnit" Text="Cena je povinná" />
+                            <RadzenNumericRangeValidator Component="PricePerUnit" Min="0"
+                                                          Text="Cena nemůže být záporná" />
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenFormField Text="Aktuální zásoba" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="@model.CurrentStock" Name="CurrentStock" Min="0" TValue="decimal" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="CurrentStock" Text="Zásoba je povinná" />
+                            <RadzenNumericRangeValidator Component="CurrentStock" Min="0"
+                                                          Text="Zásoba nemůže být záporná" />
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenFormField Text="Minimální zásoba" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="@model.MinimumStock" Name="MinimumStock" Min="0" TValue="decimal" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenRequiredValidator Component="MinimumStock" Text="Min. zásoba je povinná" />
+                            <RadzenNumericRangeValidator Component="MinimumStock" Min="0"
+                                                          Text="Min. zásoba nemůže být záporná" />
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenFormField Text="Dodavatel" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.Supplier" Name="Supplier" MaxLength="200" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Supplier" Text="Dodavatel je povinný" />
+                    <RadzenLengthValidator Component="Supplier" Max="200" Text="Maximální délka 200 znaků" />
+                </Helper>
+            </RadzenFormField>
+
+            <RadzenFormField Text="Stav" Variant="Variant.Outlined">
+                <RadzenSwitch @bind-Value="@model.IsActive" Name="IsActive" />
+                <RadzenLabel Text="@(model.IsActive ? "Aktivní" : "Neaktivní")"
+                             Style="margin-left: 0.5rem;" Component="IsActive" />
+            </RadzenFormField>
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End" style="margin-top: 1rem;">
+            <RadzenButton ButtonType="ButtonType.Submit"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Text="Uložit"
+                          Icon="save"
+                          IsBusy="@isSaving" />
+            <RadzenButton ButtonType="ButtonType.Button"
+                          ButtonStyle="ButtonStyle.Light"
+                          Text="Zrušit"
+                          Icon="cancel"
+                          Click="@Cancel" />
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int? MaterialId { get; set; }
+
+    private MaterialFormModel model = new();
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (MaterialId.HasValue)
+        {
+            await LoadMaterial(MaterialId.Value);
+        }
+        else
+        {
+            model.IsActive = true;
+        }
+    }
+
+    private async Task LoadMaterial(int id)
+    {
+        try
+        {
+            var query = new GetMaterialByIdQuery(id);
+            var material = await Mediator.Send(query);
+
+            if (material != null)
+            {
+                model = new MaterialFormModel
+                {
+                    Name = material.Name,
+                    Description = material.Description,
+                    Category = material.Category,
+                    Unit = material.Unit,
+                    PricePerUnit = material.PricePerUnit,
+                    CurrentStock = material.CurrentStock,
+                    MinimumStock = material.MinimumStock,
+                    Supplier = material.Supplier,
+                    IsActive = material.IsActive
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst materiál: {ex.Message}",
+                Duration = 4000
+            });
+            DialogService.Close(false);
+        }
+    }
+
+    private async Task OnSubmit()
+    {
+        try
+        {
+            isSaving = true;
+
+            if (MaterialId.HasValue)
+            {
+                var command = new UpdateMaterialCommand(
+                    MaterialId.Value,
+                    model.Name,
+                    model.Description,
+                    model.Category,
+                    model.Unit,
+                    model.PricePerUnit,
+                    model.Supplier,
+                    model.CurrentStock,
+                    model.MinimumStock,
+                    model.IsActive
+                );
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Materiál byl úspěšně aktualizován",
+                    Duration = 3000
+                });
+            }
+            else
+            {
+                var command = new CreateMaterialCommand(
+                    model.Name,
+                    model.Description,
+                    model.Category,
+                    model.Unit,
+                    model.PricePerUnit,
+                    model.CurrentStock,
+                    model.MinimumStock,
+                    model.Supplier
+                );
+                await Mediator.Send(command);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Materiál byl úspěšně vytvořen",
+                    Duration = 3000
+                });
+            }
+
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba ukládání",
+                Detail = $"Nepodařilo se uložit materiál: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+
+    private class MaterialFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Unit { get; set; } = string.Empty;
+        public decimal PricePerUnit { get; set; }
+        public decimal CurrentStock { get; set; }
+        public decimal MinimumStock { get; set; }
+        public string Supplier { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+    }
+}

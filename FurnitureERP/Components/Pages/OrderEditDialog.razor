@@ -1,0 +1,562 @@
+@using MediatR
+@using FurnitureERP.Application.Orders.Queries.GetOrderById
+@using FurnitureERP.Application.Orders.Commands.CreateOrder
+@using FurnitureERP.Application.Orders.Commands.AddOrderItem
+@using FurnitureERP.Application.Products.Queries.GetProducts
+@using FurnitureERP.Application.Products.DTOs
+@using FurnitureERP.Application.Orders.DTOs
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    @if (IsReadOnly)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat">
+            Zobrazení objednávky v režimu pouze pro čtení.
+        </RadzenAlert>
+    }
+
+    <RadzenTemplateForm TItem="OrderFormModel" Data="@model" Submit="@OnSubmit" InvalidSubmit="@OnInvalidSubmit">
+        <RadzenFieldset Text="Informace o zákazníkovi">
+            <RadzenStack Gap="0.5rem">
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="Jméno zákazníka" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenTextBox @bind-Value="@model.CustomerName" Name="CustomerName" MaxLength="200" Disabled="@IsReadOnly" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="CustomerName" Text="Jméno zákazníka je povinné" />
+                                <RadzenLengthValidator Component="CustomerName" Max="200" Text="Maximální délka 200 znaků" />
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="Telefon" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenTextBox @bind-Value="@model.CustomerPhone" Name="CustomerPhone" MaxLength="20" Disabled="@IsReadOnly" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="CustomerPhone" Text="Telefon je povinný" />
+                                <RadzenLengthValidator Component="CustomerPhone" Max="20" Text="Maximální délka 20 znaků" />
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="Email (volitelný)" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenTextBox @bind-Value="@model.CustomerEmail" Name="CustomerEmail" MaxLength="200" Disabled="@IsReadOnly" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenEmailValidator Component="CustomerEmail" Text="Neplatná emailová adresa" />
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="Očekávané dokončení" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenDatePicker @bind-Value="@model.ExpectedCompletionDate" Name="ExpectedCompletionDate" DateFormat="dd.MM.yyyy" Disabled="@IsReadOnly" />
+                            </ChildContent>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenFormField Text="Adresa doručení" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="@model.DeliveryAddress" Name="DeliveryAddress" Rows="2" MaxLength="500" Disabled="@IsReadOnly" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="DeliveryAddress" Text="Adresa doručení je povinná" />
+                        <RadzenLengthValidator Component="DeliveryAddress" Max="500" Text="Maximální délka 500 znaků" />
+                    </Helper>
+                </RadzenFormField>
+
+                <RadzenFormField Text="Poznámky" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="@model.Notes" Name="Notes" Rows="2" MaxLength="1000" Disabled="@IsReadOnly" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenLengthValidator Component="Notes" Max="1000" Text="Maximální délka 1000 znaků" />
+                    </Helper>
+                </RadzenFormField>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Položky objednávky">
+            <RadzenStack Gap="1rem">
+                @if (!IsReadOnly && OrderId == null)
+                {
+                    <RadzenCard>
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenText TextStyle="TextStyle.Subtitle1">Přidat položku</RadzenText>
+                            <RadzenRow AlignItems="AlignItems.End">
+                                <RadzenColumn Size="12" SizeMD="5">
+                                    <RadzenLabel Text="Produkt" />
+                                    <RadzenDropDown TValue="int?"
+                                                    Value="@selectedProductId"
+                                                    Data="@products"
+                                                    TextProperty="Name"
+                                                    ValueProperty="Id"
+                                                    Placeholder="Vyberte produkt..."
+                                                    Style="width: 100%;"
+                                                    AllowFiltering="true"
+                                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                    ValueChanged="@OnProductSelected" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="3">
+                                    <RadzenLabel Text="Množství" />
+                                    <RadzenNumeric @bind-Value="@itemQuantity" Min="1" TValue="int" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="3">
+                                    <RadzenLabel Text="Jednotková cena (Kč)" />
+                                    <RadzenNumeric @bind-Value="@itemUnitPrice" Min="0" TValue="decimal" Format="N2" ReadOnly="true" />
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="1">
+                                    <RadzenButton Icon="add"
+                                                  ButtonStyle="ButtonStyle.Success"
+                                                  Click="@AddOrderItem"
+                                                  title="Přidat" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenStack>
+                    </RadzenCard>
+                }
+
+                @if (model.OrderItems.Any())
+                {
+                    <RadzenDataGrid Data="@model.OrderItems" TItem="OrderItemFormModel" AllowPaging="false">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="OrderItemFormModel"
+                                                  Property="ProductName"
+                                                  Title="Produkt"
+                                                  Width="250px" />
+
+                            <RadzenDataGridColumn TItem="OrderItemFormModel"
+                                                  Property="ProductArticle"
+                                                  Title="Článek"
+                                                  Width="150px" />
+
+                            <RadzenDataGridColumn TItem="OrderItemFormModel"
+                                                  Property="Quantity"
+                                                  Title="Množství"
+                                                  Width="120px">
+                                <Template Context="item">
+                                    @item.Quantity ks
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            <RadzenDataGridColumn TItem="OrderItemFormModel"
+                                                  Property="UnitPrice"
+                                                  Title="Jedn. cena"
+                                                  Width="150px">
+                                <Template Context="item">
+                                    @item.UnitPrice.ToString("N2") Kč
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            <RadzenDataGridColumn TItem="OrderItemFormModel"
+                                                  Property="Subtotal"
+                                                  Title="Mezisoučet"
+                                                  Width="150px">
+                                <Template Context="item">
+                                    @item.Subtotal.ToString("N2") Kč
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            @if (!IsReadOnly && OrderId == null)
+                            {
+                                <RadzenDataGridColumn TItem="OrderItemFormModel"
+                                                      Title="Akce"
+                                                      Width="100px"
+                                                      Filterable="false"
+                                                      Sortable="false">
+                                    <Template Context="item">
+                                        <RadzenButton Icon="delete"
+                                                      ButtonStyle="ButtonStyle.Danger"
+                                                      Size="ButtonSize.Small"
+                                                      Click="@(() => RemoveOrderItem(item))"
+                                                      title="Odebrat" />
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            }
+                        </Columns>
+                    </RadzenDataGrid>
+
+                    <RadzenCard style="background-color: #f5f5f5;">
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                            <RadzenText TextStyle="TextStyle.H6">
+                                Celková částka: @model.TotalAmount.ToString("N2") Kč
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenCard>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat">
+                        Žádné položky zatím nebyly přidány.
+                    </RadzenAlert>
+                }
+            </RadzenStack>
+        </RadzenFieldset>
+
+        @if (!IsReadOnly)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End" style="margin-top: 1rem;">
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Text="Uložit"
+                              Icon="save"
+                              IsBusy="@isSaving"
+                              Disabled="@(isSaving || !model.OrderItems.Any())" />
+                <RadzenButton ButtonType="ButtonType.Button"
+                              ButtonStyle="ButtonStyle.Light"
+                              Text="Zrušit"
+                              Icon="cancel"
+                              Click="@Cancel"
+                              Disabled="@isSaving" />
+            </RadzenStack>
+        }
+        else
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End" style="margin-top: 1rem;">
+                <RadzenButton ButtonType="ButtonType.Button"
+                              ButtonStyle="ButtonStyle.Light"
+                              Text="Zavřít"
+                              Icon="close"
+                              Click="@Cancel" />
+            </RadzenStack>
+        }
+    </RadzenTemplateForm>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int? OrderId { get; set; }
+
+    [Parameter]
+    public bool IsReadOnly { get; set; } = false;
+
+    private OrderFormModel model = new();
+    private bool isSaving = false;
+    private List<ProductDto> products = new();
+
+    private int? selectedProductId;
+    private int itemQuantity = 1;
+    private decimal itemUnitPrice = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+
+        if (OrderId.HasValue)
+        {
+            await LoadOrder(OrderId.Value);
+        }
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            var query = new GetProductsQuery();
+            var result = await Mediator.Send(query);
+            products = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst seznam produktů: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task LoadOrder(int id)
+    {
+        try
+        {
+            var query = new GetOrderByIdQuery(id);
+            var order = await Mediator.Send(query);
+
+            if (order != null)
+            {
+                model = new OrderFormModel
+                {
+                    CustomerName = order.CustomerName,
+                    CustomerPhone = order.CustomerPhone,
+                    CustomerEmail = order.CustomerEmail,
+                    DeliveryAddress = order.DeliveryAddress,
+                    ExpectedCompletionDate = order.ExpectedCompletionDate,
+                    Notes = order.Notes,
+                    OrderItems = order.OrderItems.Select(oi => new OrderItemFormModel
+                    {
+                        ProductId = oi.ProductId,
+                        ProductName = oi.ProductName,
+                        ProductArticle = oi.ProductArticle,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice,
+                        Subtotal = oi.Subtotal,
+                        Notes = oi.Notes
+                    }).ToList()
+                };
+                CalculateTotalAmount();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst objednávku: {ex.Message}",
+                Duration = 4000
+            });
+            DialogService.Close(false);
+        }
+    }
+
+    private void OnProductSelected(int? productId)
+    {
+        selectedProductId = productId;
+
+        if (selectedProductId.HasValue)
+        {
+            var product = products.FirstOrDefault(p => p.Id == selectedProductId.Value);
+            if (product != null)
+            {
+                itemUnitPrice = product.SalePrice;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            itemUnitPrice = 0;
+        }
+    }
+
+    private void AddOrderItem()
+    {
+        if (!selectedProductId.HasValue)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Vyberte prosím produkt",
+                Duration = 3000
+            });
+            return;
+        }
+
+        if (itemQuantity <= 0)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Množství musí být větší než 0",
+                Duration = 3000
+            });
+            return;
+        }
+
+        var product = products.FirstOrDefault(p => p.Id == selectedProductId.Value);
+        if (product == null)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba",
+                Detail = "Vybraný produkt nebyl nalezen",
+                Duration = 3000
+            });
+            return;
+        }
+
+        // Check if product already exists in order items
+        if (model.OrderItems.Any(oi => oi.ProductId == selectedProductId.Value))
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Tento produkt je již v objednávce",
+                Duration = 3000
+            });
+            return;
+        }
+
+        var orderItem = new OrderItemFormModel
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            ProductArticle = product.Article,
+            Quantity = itemQuantity,
+            UnitPrice = itemUnitPrice,
+            Subtotal = itemQuantity * itemUnitPrice,
+            Notes = string.Empty
+        };
+
+        model.OrderItems.Add(orderItem);
+        CalculateTotalAmount();
+
+        // Reset form
+        selectedProductId = null;
+        itemQuantity = 1;
+        itemUnitPrice = 0;
+
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Úspěch",
+            Detail = "Položka byla přidána",
+            Duration = 2000
+        });
+    }
+
+    private void RemoveOrderItem(OrderItemFormModel item)
+    {
+        model.OrderItems.Remove(item);
+        CalculateTotalAmount();
+
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Info,
+            Summary = "Informace",
+            Detail = "Položka byla odebrána",
+            Duration = 2000
+        });
+    }
+
+    private void CalculateTotalAmount()
+    {
+        model.TotalAmount = model.OrderItems.Sum(oi => oi.Subtotal);
+    }
+
+    private void OnInvalidSubmit()
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Warning,
+            Summary = "Upozornění",
+            Detail = "Prosím vyplňte všechna povinná pole (jméno, telefon, adresa)",
+            Duration = 4000
+        });
+    }
+
+    private async Task OnSubmit()
+    {
+        if (!model.OrderItems.Any())
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Objednávka musí obsahovat alespoň jednu položku",
+                Duration = 4000
+            });
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+
+            if (OrderId.HasValue)
+            {
+                // For existing orders, we would need an UpdateOrderCommand
+                // Since it's not in the provided commands, we'll show a message
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Upozornění",
+                    Detail = "Úprava existujících objednávek zatím není podporována",
+                    Duration = 4000
+                });
+            }
+            else
+            {
+                var createCommand = new CreateOrderCommand(
+                    model.CustomerName,
+                    model.CustomerPhone,
+                    model.DeliveryAddress,
+                    model.ExpectedCompletionDate,
+                    model.CustomerEmail,
+                    model.Notes
+                );
+                var orderId = await Mediator.Send(createCommand);
+
+                foreach (var item in model.OrderItems)
+                {
+                    var addItemCommand = new AddOrderItemCommand(
+                        orderId,
+                        item.ProductId,
+                        item.Quantity,
+                        item.UnitPrice,
+                        item.Notes
+                    );
+                    await Mediator.Send(addItemCommand);
+                }
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Objednávka byla úspěšně vytvořena",
+                    Duration = 3000
+                });
+
+                DialogService.Close(true);
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba ukládání",
+                Detail = $"Nepodařilo se uložit objednávku: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close(false);
+    }
+
+    private class OrderFormModel
+    {
+        public string CustomerName { get; set; } = string.Empty;
+        public string CustomerPhone { get; set; } = string.Empty;
+        public string? CustomerEmail { get; set; }
+        public string DeliveryAddress { get; set; } = string.Empty;
+        public DateTime? ExpectedCompletionDate { get; set; }
+        public string Notes { get; set; } = string.Empty;
+        public List<OrderItemFormModel> OrderItems { get; set; } = new();
+        public decimal TotalAmount { get; set; }
+    }
+
+    private class OrderItemFormModel
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string ProductArticle { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal Subtotal { get; set; }
+        public string Notes { get; set; } = string.Empty;
+    }
+}
