@@ -150,6 +150,35 @@ public class Order : AggregateRoot
         AddDomainEvent(new OrderDeliveredEvent(Id, OrderNumber, DateTime.UtcNow));
     }
 
+    public void UpdateCustomerInfo(
+        string customerName,
+        string customerPhone,
+        string deliveryAddress,
+        string? customerEmail = null,
+        string notes = "",
+        DateTime? expectedCompletionDate = null)
+    {
+        if (Status != OrderStatus.Pending)
+            throw new DomainException($"Nelze upravovat objednávku se stavem {Status}");
+
+        if (string.IsNullOrWhiteSpace(customerName))
+            throw new InvalidOrderDataException("Jméno zákazníka nesmí být prázdné");
+
+        if (string.IsNullOrWhiteSpace(customerPhone))
+            throw new InvalidOrderDataException("Telefon zákazníka nesmí být prázdný");
+
+        if (string.IsNullOrWhiteSpace(deliveryAddress))
+            throw new InvalidOrderDataException("Adresa dodání nesmí být prázdná");
+
+        CustomerName = customerName.Trim();
+        CustomerPhone = customerPhone.Trim();
+        CustomerEmail = customerEmail?.Trim();
+        DeliveryAddress = deliveryAddress.Trim();
+        Notes = notes?.Trim() ?? string.Empty;
+        ExpectedCompletionDate = expectedCompletionDate;
+        MarkAsUpdated();
+    }
+
     public void UpdateExpectedCompletionDate(DateTime newDate)
     {
         if (newDate < OrderDate)

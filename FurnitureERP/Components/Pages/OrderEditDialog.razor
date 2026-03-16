@@ -1,7 +1,9 @@
 @using MediatR
 @using FurnitureERP.Application.Orders.Queries.GetOrderById
 @using FurnitureERP.Application.Orders.Commands.CreateOrder
+@using FurnitureERP.Application.Orders.Commands.UpdateOrder
 @using FurnitureERP.Application.Orders.Commands.AddOrderItem
+@using FurnitureERP.Application.Orders.Commands.RemoveOrderItem
 @using FurnitureERP.Application.Products.Queries.GetProducts
 @using FurnitureERP.Application.Products.DTOs
 @using FurnitureERP.Application.Orders.DTOs
@@ -88,7 +90,7 @@
 
         <RadzenFieldset Text="Položky objednávky">
             <RadzenStack Gap="1rem">
-                @if (!IsReadOnly && OrderId == null)
+                @if (!IsReadOnly)
                 {
                     <RadzenCard>
                         <RadzenStack Gap="0.5rem">
@@ -98,7 +100,7 @@
                                     <RadzenLabel Text="Produkt" />
                                     <RadzenDropDown TValue="int?"
                                                     Value="@selectedProductId"
-                                                    Data="@products"
+                                                    Data="@availableProducts"
                                                     TextProperty="Name"
                                                     ValueProperty="Id"
                                                     Placeholder="Vyberte produkt..."
@@ -128,7 +130,7 @@
 
                 @if (model.OrderItems.Any())
                 {
-                    <RadzenDataGrid Data="@model.OrderItems" TItem="OrderItemFormModel" AllowPaging="false">
+                    <RadzenDataGrid @ref="itemsGrid" Data="@model.OrderItems" TItem="OrderItemFormModel" AllowPaging="false">
                         <Columns>
                             <RadzenDataGridColumn TItem="OrderItemFormModel"
                                                   Property="ProductName"
@@ -167,7 +169,7 @@
                                 </Template>
                             </RadzenDataGridColumn>
 
-                            @if (!IsReadOnly && OrderId == null)
+                            @if (!IsReadOnly)
                             {
                                 <RadzenDataGridColumn TItem="OrderItemFormModel"
                                                       Title="Akce"
@@ -242,7 +244,10 @@
 
     private OrderFormModel model = new();
     private bool isSaving = false;
+    private bool _itemsChanged = false;
     private List<ProductDto> products = new();
+    private List<ProductDto> availableProducts = new();
+    private RadzenDataGrid<OrderItemFormModel>? itemsGrid;
 
     private int? selectedProductId;
     private int itemQuantity = 1;
@@ -262,9 +267,9 @@
     {
         try
         {
-            var query = new GetProductsQuery();
-            var result = await Mediator.Send(query);
+            var result = await Mediator.Send(new GetProductsQuery());
             products = result.ToList();
+            RefreshAvailableProducts();
         }
         catch (Exception ex)
         {
@@ -278,12 +283,17 @@
         }
     }
 
+    private void RefreshAvailableProducts()
+    {
+        var usedIds = model.OrderItems.Select(oi => oi.ProductId).ToHashSet();
+        availableProducts = products.Where(p => !usedIds.Contains(p.Id)).ToList();
+    }
+
     private async Task LoadOrder(int id)
     {
         try
         {
-            var query = new GetOrderByIdQuery(id);
-            var order = await Mediator.Send(query);
+            var order = await Mediator.Send(new GetOrderByIdQuery(id));
 
             if (order != null)
             {
@@ -307,6 +317,7 @@
                     }).ToList()
                 };
                 CalculateTotalAmount();
+                RefreshAvailableProducts();
             }
         }
         catch (Exception ex)
@@ -325,23 +336,12 @@
     private void OnProductSelected(int? productId)
     {
         selectedProductId = productId;
-
-        if (selectedProductId.HasValue)
-        {
-            var product = products.FirstOrDefault(p => p.Id == selectedProductId.Value);
-            if (product != null)
-            {
-                itemUnitPrice = product.SalePrice;
-                StateHasChanged();
-            }
-        }
-        else
-        {
-            itemUnitPrice = 0;
-        }
+        itemUnitPrice = selectedProductId.HasValue
+            ? products.FirstOrDefault(p => p.Id == selectedProductId.Value)?.SalePrice ?? 0
+            : 0;
     }
 
-    private void AddOrderItem()
+    private async Task AddOrderItem()
     {
         if (!selectedProductId.HasValue)
         {
@@ -368,32 +368,30 @@
         }
 
         var product = products.FirstOrDefault(p => p.Id == selectedProductId.Value);
-        if (product == null)
+        if (product == null) return;
+
+        // For existing orders save immediately via command
+        if (OrderId.HasValue)
         {
-            NotificationService.Notify(new NotificationMessage
+            try
             {
-                Severity = NotificationSeverity.Error,
-                Summary = "Chyba",
-                Detail = "Vybraný produkt nebyl nalezen",
-                Duration = 3000
-            });
-            return;
+                var command = new AddOrderItemCommand(OrderId.Value, product.Id, itemQuantity, itemUnitPrice, string.Empty);
+                await Mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba",
+                    Detail = $"Nepodařilo se přidat položku: {ex.Message}",
+                    Duration = 4000
+                });
+                return;
+            }
         }
 
-        // Check if product already exists in order items
-        if (model.OrderItems.Any(oi => oi.ProductId == selectedProductId.Value))
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Upozornění",
-                Detail = "Tento produkt je již v objednávce",
-                Duration = 3000
-            });
-            return;
-        }
-
-        var orderItem = new OrderItemFormModel
+        model.OrderItems.Add(new OrderItemFormModel
         {
             ProductId = product.Id,
             ProductName = product.Name,
@@ -402,15 +400,18 @@
             UnitPrice = itemUnitPrice,
             Subtotal = itemQuantity * itemUnitPrice,
             Notes = string.Empty
-        };
+        });
 
-        model.OrderItems.Add(orderItem);
+        _itemsChanged = true;
         CalculateTotalAmount();
+        RefreshAvailableProducts();
 
-        // Reset form
         selectedProductId = null;
         itemQuantity = 1;
         itemUnitPrice = 0;
+
+        if (itemsGrid != null)
+            await itemsGrid.Reload();
 
         NotificationService.Notify(new NotificationMessage
         {
@@ -421,10 +422,36 @@
         });
     }
 
-    private void RemoveOrderItem(OrderItemFormModel item)
+    private async Task RemoveOrderItem(OrderItemFormModel item)
     {
+        // For existing orders remove via command immediately
+        if (OrderId.HasValue)
+        {
+            try
+            {
+                var command = new RemoveOrderItemCommand(OrderId.Value, item.ProductId);
+                await Mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba",
+                    Detail = $"Nepodařilo se odebrat položku: {ex.Message}",
+                    Duration = 4000
+                });
+                return;
+            }
+        }
+
         model.OrderItems.Remove(item);
+        _itemsChanged = true;
         CalculateTotalAmount();
+        RefreshAvailableProducts();
+
+        if (itemsGrid != null)
+            await itemsGrid.Reload();
 
         NotificationService.Notify(new NotificationMessage
         {
@@ -471,14 +498,24 @@
 
             if (OrderId.HasValue)
             {
-                // For existing orders, we would need an UpdateOrderCommand
-                // Since it's not in the provided commands, we'll show a message
+                // Update customer info only — items are saved immediately on add/remove
+                var updateCommand = new UpdateOrderCommand(
+                    OrderId.Value,
+                    model.CustomerName,
+                    model.CustomerPhone,
+                    model.DeliveryAddress,
+                    model.CustomerEmail,
+                    model.Notes,
+                    model.ExpectedCompletionDate
+                );
+                await Mediator.Send(updateCommand);
+
                 NotificationService.Notify(new NotificationMessage
                 {
-                    Severity = NotificationSeverity.Warning,
-                    Summary = "Upozornění",
-                    Detail = "Úprava existujících objednávek zatím není podporována",
-                    Duration = 4000
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Objednávka byla úspěšně upravena",
+                    Duration = 3000
                 });
             }
             else
@@ -495,14 +532,7 @@
 
                 foreach (var item in model.OrderItems)
                 {
-                    var addItemCommand = new AddOrderItemCommand(
-                        orderId,
-                        item.ProductId,
-                        item.Quantity,
-                        item.UnitPrice,
-                        item.Notes
-                    );
-                    await Mediator.Send(addItemCommand);
+                    await Mediator.Send(new AddOrderItemCommand(orderId, item.ProductId, item.Quantity, item.UnitPrice, item.Notes));
                 }
 
                 NotificationService.Notify(new NotificationMessage
@@ -512,9 +542,9 @@
                     Detail = "Objednávka byla úspěšně vytvořena",
                     Duration = 3000
                 });
-
-                DialogService.Close(true);
             }
+
+            DialogService.Close(true);
         }
         catch (Exception ex)
         {
@@ -534,7 +564,8 @@
 
     private void Cancel()
     {
-        DialogService.Close(false);
+        // If items were changed in edit mode, notify parent to reload
+        DialogService.Close(OrderId.HasValue && _itemsChanged);
     }
 
     private class OrderFormModel

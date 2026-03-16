@@ -22,5 +22,9 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
 
         RuleFor(p => p.BasePrice)
             .GreaterThan(0).WithMessage("Základní cena musí být větší než 0");
+
+        RuleFor(p => p.Materials)
+            .NotNull().WithMessage("Kusovník musí obsahovat alespoň jeden materiál")
+            .Must(m => m != null && m.Count > 0).WithMessage("Kusovník musí obsahovat alespoň jeden materiál");
     }
 }
