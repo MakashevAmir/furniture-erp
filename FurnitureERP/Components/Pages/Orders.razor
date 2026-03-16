@@ -7,6 +7,7 @@
 @using FurnitureERP.Application.Orders.Commands.ConfirmOrder
 @using FurnitureERP.Application.Orders.Commands.CompleteOrder
 @using FurnitureERP.Application.Orders.Commands.CancelOrder
+@using FurnitureERP.Application.Orders.Commands.DeliverOrder
 @using FurnitureERP.Application.Orders.DTOs
 @using FurnitureERP.Domain.Aggregates.Orders
 @rendermode InteractiveServer
@@ -169,6 +170,14 @@
                                               Size="ButtonSize.Small"
                                               Click="@(() => CompleteOrderAction(order.Id))"
                                               title="Dokončit" />
+                            }
+                            @if (order.Status == OrderStatus.Completed)
+                            {
+                                <RadzenButton Icon="local_shipping"
+                                              ButtonStyle="ButtonStyle.Primary"
+                                              Size="ButtonSize.Small"
+                                              Click="@(() => DeliverOrderAction(order.Id))"
+                                              title="Doručit" />
                             }
                             @if (order.Status == OrderStatus.Pending || order.Status == OrderStatus.InProduction)
                             {
@@ -420,6 +429,44 @@
                     Severity = NotificationSeverity.Error,
                     Summary = "Chyba zrušení",
                     Detail = $"Nepodařilo se zrušit objednávku: {ex.Message}",
+                    Duration = 4000
+                });
+            }
+        }
+    }
+
+    private async Task DeliverOrderAction(int orderId)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Opravdu chcete označit tuto objednávku jako doručenou?",
+            "Doručení objednávky",
+            new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
+        );
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await Mediator.Send(new DeliverOrderCommand(orderId));
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = "Objednávka byla označena jako doručená",
+                    Duration = 3000
+                });
+
+                await LoadOrders();
+                await grid!.Reload();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Chyba",
+                    Detail = $"Nepodařilo se doručit objednávku: {ex.Message}",
                     Duration = 4000
                 });
             }
