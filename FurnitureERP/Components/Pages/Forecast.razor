@@ -1,0 +1,227 @@
+@page "/forecast"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@using MediatR
+@using FurnitureERP.Application.Materials.Queries.GetInventoryForecast
+@using FurnitureERP.Application.Materials.DTOs
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+
+<PageTitle>Prognóza zásob - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12" SizeMD="8">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
+                Prognóza zásob
+            </RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" style="color: gray;">
+                Potřeba materiálů pro aktivní objednávky (čekající + ve výrobě)
+            </RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4" class="rz-text-align-md-end">
+            <RadzenButton Icon="refresh" Text="Aktualizovat" Click="@LoadForecast" ButtonStyle="ButtonStyle.Light" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard style="border-left: 4px solid #f44336;">
+                <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray;">Kritický nedostatek</RadzenText>
+                <RadzenText TextStyle="TextStyle.H5" style="color: #f44336; font-weight: bold;">
+                    @forecast.Count(f => f.HasShortfall)
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">materiálů nelze pokrýt z aktuálního stavu skladu</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard style="border-left: 4px solid #ff9800;">
+                <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray;">Pod minimem</RadzenText>
+                <RadzenText TextStyle="TextStyle.H5" style="color: #ff9800; font-weight: bold;">
+                    @forecast.Count(f => f.BelowMinimum)
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">materiálů pod minimální zásobou</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard style="border-left: 4px solid #4caf50;">
+                <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray;">V pořádku</RadzenText>
+                <RadzenText TextStyle="TextStyle.H5" style="color: #4caf50; font-weight: bold;">
+                    @forecast.Count(f => !f.NeedsAttention)
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">materiálů má dostatečné zásoby</RadzenText>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard>
+        <RadzenStack Gap="0.5rem" style="margin-bottom: 1rem;">
+            <RadzenRow AlignItems="AlignItems.Center">
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenLabel Text="Zobrazit:" />
+                    <RadzenDropDown @bind-Value="@selectedFilter"
+                                    Data="@filterOptions"
+                                    TextProperty="Text"
+                                    ValueProperty="Value"
+                                    Change="@ApplyFilter"
+                                    Style="width: 100%;" />
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenStack>
+
+        <RadzenDataGrid Data="@filteredForecast"
+                        TItem="InventoryForecastDto"
+                        AllowSorting="true"
+                        AllowPaging="true"
+                        PageSize="20"
+                        IsLoading="@isLoading"
+                        RowRender="@OnRowRender">
+            <Columns>
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Title="" Width="40px" Sortable="false" Filterable="false">
+                    <Template Context="item">
+                        @if (item.HasShortfall)
+                        {
+                            <RadzenIcon Icon="error" style="color: #f44336;" title="Kritický nedostatek" />
+                        }
+                        else if (item.BelowMinimum)
+                        {
+                            <RadzenIcon Icon="warning" style="color: #ff9800;" title="Pod minimem" />
+                        }
+                        else
+                        {
+                            <RadzenIcon Icon="check_circle" style="color: #4caf50;" title="V pořádku" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="MaterialName" Title="Materiál" Width="180px" />
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="Category" Title="Kategorie" Width="130px" />
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="Supplier" Title="Dodavatel" Width="150px" />
+
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="CurrentStock" Title="Skladem" Width="120px">
+                    <Template Context="item">
+                        <span style="@(item.BelowMinimum ? "color: #f44336; font-weight: bold;" : "")">
+                            @item.CurrentStock.ToString("N2") @item.Unit
+                        </span>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="MinimumStock" Title="Minimum" Width="120px">
+                    <Template Context="item">
+                        @item.MinimumStock.ToString("N2") @item.Unit
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="RequiredForOrders" Title="Potřeba pro zakázky" Width="160px">
+                    <Template Context="item">
+                        @if (item.RequiredForOrders > 0)
+                        {
+                            <span style="font-weight: bold;">@item.RequiredForOrders.ToString("N2") @item.Unit</span>
+                        }
+                        else
+                        {
+                            <span style="color: gray;">—</span>
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="ShortfallForOrders" Title="Chybí pro zakázky" Width="150px">
+                    <Template Context="item">
+                        @if (item.ShortfallForOrders > 0)
+                        {
+                            <span style="color: #f44336; font-weight: bold;">@item.ShortfallForOrders.ToString("N2") @item.Unit</span>
+                        }
+                        else
+                        {
+                            <span style="color: #4caf50;">—</span>
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Property="RecommendedPurchase" Title="Doporučený nákup" Width="160px">
+                    <Template Context="item">
+                        @if (item.RecommendedPurchase > 0)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@($"{item.RecommendedPurchase:N2} {item.Unit}")" />
+                        }
+                        else
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Není třeba" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private List<InventoryForecastDto> forecast = new();
+    private List<InventoryForecastDto> filteredForecast = new();
+    private bool isLoading = false;
+    private string selectedFilter = "all";
+
+    private List<FilterOption> filterOptions = new()
+    {
+        new FilterOption { Value = "all", Text = "Všechny materiály" },
+        new FilterOption { Value = "attention", Text = "Vyžadují pozornost" },
+        new FilterOption { Value = "shortfall", Text = "Pouze kritický nedostatek" },
+        new FilterOption { Value = "below_min", Text = "Pod minimální zásobou" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadForecast();
+    }
+
+    private async Task LoadForecast()
+    {
+        try
+        {
+            isLoading = true;
+            var result = await Mediator.Send(new GetInventoryForecastQuery());
+            forecast = result.ToList();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst prognózu: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        filteredForecast = selectedFilter switch
+        {
+            "attention" => forecast.Where(f => f.NeedsAttention).ToList(),
+            "shortfall" => forecast.Where(f => f.HasShortfall).ToList(),
+            "below_min" => forecast.Where(f => f.BelowMinimum).ToList(),
+            _ => forecast
+        };
+    }
+
+    private void OnRowRender(RowRenderEventArgs<InventoryForecastDto> args)
+    {
+        if (args.Data.HasShortfall)
+            args.Attributes.Add("style", "background-color: #fff3f3;");
+        else if (args.Data.BelowMinimum)
+            args.Attributes.Add("style", "background-color: #fff8e1;");
+    }
+
+    private class FilterOption
+    {
+        public string Value { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
+    }
+}
