@@ -1,6 +1,6 @@
 @page "/orders"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Admin,Manager")]
 @using MediatR
 @using FurnitureERP.Application.Orders.Queries.GetOrders
 @using FurnitureERP.Application.Orders.Commands.DeleteOrder

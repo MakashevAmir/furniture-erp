@@ -155,6 +155,26 @@ h1:focus {
     background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
 }
 
+/* Light button в header (на тёмном фоне) */
+.rz-header .rz-button.rz-light,
+.rz-header .rz-button.rz-secondary {
+    color: white !important;
+    border-color: rgba(255,255,255,0.5) !important;
+    background: transparent !important;
+}
+
+.rz-header .rz-button.rz-light:hover,
+.rz-header .rz-button.rz-secondary:hover {
+    background: rgba(255,255,255,0.15) !important;
+    color: white !important;
+    border-color: rgba(255,255,255,0.8) !important;
+}
+
+.rz-header .rz-button .rzi,
+.rz-header .rz-button .rz-button-icon {
+    color: white !important;
+}
+
 /* ===== Forms ===== */
 .rz-textbox,
 .rz-textarea,

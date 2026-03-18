@@ -1,0 +1,273 @@
+@page "/owner"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin,Owner")]
+@using MediatR
+@using FurnitureERP.Application.Owner.DTOs
+@using FurnitureERP.Application.Owner.Queries.GetOwnerDashboard
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+
+<PageTitle>Přehled vlastníka - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12" SizeMD="7">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
+                Přehled vlastníka
+            </RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" style="color: gray;">
+                Finanční přehled za dokončené zakázky
+            </RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="5" class="rz-text-align-md-end">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" JustifyContent="JustifyContent.End" AlignItems="AlignItems.Center">
+                <RadzenButton Icon="chevron_left" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                              Click="@PreviousMonth" />
+                <span style="min-width: 140px; text-align: center; font-weight: 600; font-size: 1rem;">
+                    @GetMonthName(selectedMonth) @selectedYear
+                </span>
+                <RadzenButton Icon="chevron_right" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                              Click="@NextMonth" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @if (isLoading)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (dashboard != null)
+    {
+        @* Финансовые карточки *@
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard style="border-left: 4px solid #4caf50;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray;">Výnosy</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H5" style="color: #4caf50; font-weight: bold;">
+                        @dashboard.Revenue.ToString("N0") Kč
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">@dashboard.CompletedOrdersCount dokončených zakázek</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard style="border-left: 4px solid #f44336;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray;">Náklady na materiál</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H5" style="color: #f44336; font-weight: bold;">
+                        @dashboard.MaterialCosts.ToString("N0") Kč
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">spotřeba materiálů</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard style="border-left: 4px solid #ff9800;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray;">Mzdové náklady</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H5" style="color: #ff9800; font-weight: bold;">
+                        @dashboard.LaborCosts.ToString("N0") Kč
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">pracovní čas zaměstnanců</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard style="@GetProfitCardStyle()">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray;">Čistý zisk</RadzenText>
+                    <RadzenText TextStyle="TextStyle.H5" style="@GetProfitTextStyle()">
+                        @dashboard.NetProfit.ToString("N0") Kč
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2">výnosy − náklady</RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        @* Статистика заказов за месяц *@
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray; margin-bottom: 0.5rem;">Zakázky v měsíci</RadzenText>
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                            <RadzenText>Celkem vytvořeno:</RadzenText>
+                            <RadzenText style="font-weight: bold;">@dashboard.TotalOrdersCount</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                            <RadzenText>Dokončeno/Doručeno:</RadzenText>
+                            <RadzenText style="font-weight: bold; color: #4caf50;">@dashboard.CompletedOrdersCount</RadzenText>
+                        </RadzenStack>
+                        @if (dashboard.TotalOrdersCount > 0)
+                        {
+                            <RadzenProgressBar Value="@(dashboard.CompletedOrdersCount * 100.0 / dashboard.TotalOrdersCount)"
+                                              ShowValue="false" style="height: 8px;" />
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="8">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" style="color: gray; margin-bottom: 0.5rem;">Přehled nákladů</RadzenText>
+                    @if (dashboard.Revenue > 0)
+                    {
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                                <RadzenText style="color: #f44336;">Materiály (@((dashboard.MaterialCosts / dashboard.Revenue * 100).ToString("N1"))%):</RadzenText>
+                                <RadzenText style="font-weight: bold;">@dashboard.MaterialCosts.ToString("N0") Kč</RadzenText>
+                            </RadzenStack>
+                            <RadzenProgressBar Value="@((double)(dashboard.MaterialCosts / dashboard.Revenue * 100))"
+                                              ShowValue="false" style="height: 8px; --rz-progressbar-fill-background-color: #f44336;" />
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                                <RadzenText style="color: #ff9800;">Mzdy (@((dashboard.LaborCosts / dashboard.Revenue * 100).ToString("N1"))%):</RadzenText>
+                                <RadzenText style="font-weight: bold;">@dashboard.LaborCosts.ToString("N0") Kč</RadzenText>
+                            </RadzenStack>
+                            <RadzenProgressBar Value="@((double)(dashboard.LaborCosts / dashboard.Revenue * 100))"
+                                              ShowValue="false" style="height: 8px; --rz-progressbar-fill-background-color: #ff9800;" />
+                        </RadzenStack>
+                    }
+                    else
+                    {
+                        <RadzenText style="color: gray;">Žádné dokončené zakázky v tomto měsíci</RadzenText>
+                    }
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        @* Топ продукты и сотрудники *@
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Subtitle1" style="font-weight: bold; margin-bottom: 1rem;">
+                        Top produkty
+                    </RadzenText>
+                    @if (dashboard.TopProducts.Any())
+                    {
+                        <RadzenDataGrid Data="@dashboard.TopProducts" TItem="TopProductDto"
+                                        AllowSorting="false" AllowPaging="false" ShowPagingSummary="false">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="TopProductDto" Property="ProductName" Title="Produkt" />
+                                <RadzenDataGridColumn TItem="TopProductDto" Property="TotalQuantity" Title="Ks" Width="60px" />
+                                <RadzenDataGridColumn TItem="TopProductDto" Property="TotalRevenue" Title="Výnosy" Width="130px">
+                                    <Template Context="item">
+                                        <span style="font-weight: bold; color: #4caf50;">@item.TotalRevenue.ToString("N0") Kč</span>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    }
+                    else
+                    {
+                        <RadzenText style="color: gray;">Žádné dokončené zakázky</RadzenText>
+                    }
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Subtitle1" style="font-weight: bold; margin-bottom: 1rem;">
+                        Pracovní čas zaměstnanců
+                    </RadzenText>
+                    @if (dashboard.EmployeeWork.Any())
+                    {
+                        <RadzenDataGrid Data="@dashboard.EmployeeWork" TItem="EmployeeWorkDto"
+                                        AllowSorting="false" AllowPaging="false" ShowPagingSummary="false">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="EmployeeWorkDto" Property="DisplayName" Title="Zaměstnanec" />
+                                <RadzenDataGridColumn TItem="EmployeeWorkDto" Property="TotalHours" Title="Hodiny" Width="80px">
+                                    <Template Context="item">
+                                        @item.TotalHours.ToString("N1") h
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="EmployeeWorkDto" Property="LaborCost" Title="Mzdové náklady" Width="140px">
+                                    <Template Context="item">
+                                        @if (item.LaborCost > 0)
+                                        {
+                                            <span style="font-weight: bold;">@item.LaborCost.ToString("N0") Kč</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="color: gray;">—</span>
+                                        }
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    }
+                    else
+                    {
+                        <RadzenText style="color: gray;">Žádné přiřazené práce</RadzenText>
+                    }
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    }
+</RadzenStack>
+
+@code {
+    private OwnerDashboardDto? dashboard;
+    private bool isLoading = false;
+    private int selectedYear = DateTime.Now.Year;
+    private int selectedMonth = DateTime.Now.Month;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboard();
+    }
+
+    private async Task LoadDashboard()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            dashboard = await Mediator.Send(new GetOwnerDashboardQuery(selectedYear, selectedMonth));
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = $"Nepodařilo se načíst přehled: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PreviousMonth()
+    {
+        var date = new DateTime(selectedYear, selectedMonth, 1).AddMonths(-1);
+        selectedYear = date.Year;
+        selectedMonth = date.Month;
+        await LoadDashboard();
+    }
+
+    private async Task NextMonth()
+    {
+        var date = new DateTime(selectedYear, selectedMonth, 1).AddMonths(1);
+        selectedYear = date.Year;
+        selectedMonth = date.Month;
+        await LoadDashboard();
+    }
+
+    private string GetProfitCardStyle() =>
+        $"border-left: 4px solid {(dashboard?.NetProfit >= 0 ? "#2196f3" : "#f44336")};";
+
+    private string GetProfitTextStyle() =>
+        $"color: {(dashboard?.NetProfit >= 0 ? "#2196f3" : "#f44336")}; font-weight: bold;";
+
+    private string GetMonthName(int month) => month switch
+    {
+        1 => "Leden", 2 => "Únor", 3 => "Březen", 4 => "Duben",
+        5 => "Květen", 6 => "Červen", 7 => "Červenec", 8 => "Srpen",
+        9 => "Září", 10 => "Říjen", 11 => "Listopad", 12 => "Prosinec",
+        _ => month.ToString()
+    };
+
+    private string GetMonthShort(int month) => month switch
+    {
+        1 => "Led", 2 => "Úno", 3 => "Bře", 4 => "Dub",
+        5 => "Kvě", 6 => "Čer", 7 => "Čvc", 8 => "Srp",
+        9 => "Zář", 10 => "Říj", 11 => "Lis", 12 => "Pro",
+        _ => month.ToString()
+    };
+}

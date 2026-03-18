@@ -1,6 +1,6 @@
 @page "/forecast"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Admin,Manager,Warehouse")]
 @using MediatR
 @using FurnitureERP.Application.Materials.Queries.GetInventoryForecast
 @using FurnitureERP.Application.Materials.DTOs

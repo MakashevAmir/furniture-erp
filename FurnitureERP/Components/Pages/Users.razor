@@ -1,0 +1,297 @@
+@page "/users"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using FurnitureERP.Data
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Správa uživatelů - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
+                Správa uživatelů
+            </RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" class="rz-text-align-md-end">
+            <RadzenButton Icon="add_circle_outline" Text="Vytvořit uživatele"
+                          Click="@OpenCreateDialog" ButtonStyle="ButtonStyle.Primary" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard>
+        <RadzenDataGrid Data="@users" TItem="UserViewModel"
+                        AllowSorting="true" AllowPaging="true" PageSize="20" IsLoading="@isLoading">
+            <Columns>
+                <RadzenDataGridColumn TItem="UserViewModel" Property="UserName" Title="Uživatelské jméno" Width="200px" />
+                <RadzenDataGridColumn TItem="UserViewModel" Property="Email" Title="Email" Width="250px" />
+                <RadzenDataGridColumn TItem="UserViewModel" Title="Role" Width="250px" Sortable="false">
+                    <Template Context="user">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" Wrap="FlexWrap.Wrap">
+                            @foreach (var role in user.Roles)
+                            {
+                                <RadzenBadge BadgeStyle="@GetRoleBadgeStyle(role)" Text="@role" />
+                            }
+                            @if (!user.Roles.Any())
+                            {
+                                <span style="color: gray;">Bez role</span>
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="UserViewModel" Title="Akce" Width="150px" Sortable="false">
+                    <Template Context="user">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Icon="manage_accounts" ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small" Click="@(() => OpenRolesDialog(user))"
+                                          title="Spravovat role" />
+                            @if (user.UserName != "admin")
+                            {
+                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger"
+                                              Size="ButtonSize.Small" Click="@(() => DeleteUser(user))"
+                                              title="Smazat" />
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@if (showCreateDialog)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <RadzenCard style="min-width: 420px; padding: 2rem;">
+            <RadzenText TextStyle="TextStyle.H6" style="margin-bottom: 1rem;">Nový uživatel</RadzenText>
+            <RadzenStack Gap="0.75rem">
+                <RadzenFormField Text="Uživatelské jméno" Variant="Variant.Outlined">
+                    <RadzenTextBox @bind-Value="newUserName" />
+                </RadzenFormField>
+                <RadzenFormField Text="Email" Variant="Variant.Outlined">
+                    <RadzenTextBox @bind-Value="newEmail" />
+                </RadzenFormField>
+                <RadzenFormField Text="Heslo" Variant="Variant.Outlined">
+                    <RadzenPassword @bind-Value="newPassword" />
+                </RadzenFormField>
+                <RadzenFormField Text="Role" Variant="Variant.Outlined">
+                    <RadzenDropDown @bind-Value="newRole" Data="@availableRoles" Style="width: 100%;" />
+                </RadzenFormField>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                    <RadzenButton Text="Vytvořit" ButtonStyle="ButtonStyle.Primary"
+                                  Click="@CreateUser" IsBusy="@isSaving" />
+                    <RadzenButton Text="Zrušit" ButtonStyle="ButtonStyle.Light"
+                                  Click="@(() => showCreateDialog = false)" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+    </div>
+}
+
+@if (showRolesDialog && selectedUser != null)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <RadzenCard style="min-width: 420px; padding: 2rem;">
+            <RadzenText TextStyle="TextStyle.H6" style="margin-bottom: 1rem;">
+                Role uživatele: @selectedUser.UserName
+            </RadzenText>
+            <RadzenStack Gap="0.5rem">
+                @foreach (var role in availableRoles)
+                {
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenCheckBox Value="@selectedUser.Roles.Contains(role)"
+                                        TValue="bool"
+                                        Change="@(async v => await ToggleRole(selectedUser, role, v))" />
+                        <RadzenLabel Text="@role" />
+                    </RadzenStack>
+                }
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem"
+                             JustifyContent="JustifyContent.End" style="margin-top: 1rem;">
+                    <RadzenButton Text="Zavřít" ButtonStyle="ButtonStyle.Light"
+                                  Click="@(() => showRolesDialog = false)" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+    </div>
+}
+
+@code {
+    private List<UserViewModel> users = new();
+    private List<string> availableRoles = new();
+    private bool isLoading = false;
+    private bool isSaving = false;
+
+    private bool showCreateDialog = false;
+    private bool showRolesDialog = false;
+    private UserViewModel? selectedUser;
+
+    private string newUserName = string.Empty;
+    private string newEmail = string.Empty;
+    private string newPassword = string.Empty;
+    private string newRole = "Manager";
+
+    protected override async Task OnInitializedAsync()
+    {
+        availableRoles = RoleManager.Roles.Select(r => r.Name!).OrderBy(r => r).ToList();
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        isLoading = true;
+        var allUsers = UserManager.Users.ToList();
+        users = new List<UserViewModel>();
+
+        foreach (var user in allUsers)
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            users.Add(new UserViewModel
+            {
+                Id = user.Id,
+                UserName = user.UserName ?? string.Empty,
+                Email = user.Email ?? string.Empty,
+                Roles = roles.ToList()
+            });
+        }
+        isLoading = false;
+    }
+
+    private void OpenCreateDialog()
+    {
+        newUserName = string.Empty;
+        newEmail = string.Empty;
+        newPassword = string.Empty;
+        newRole = "Manager";
+        showCreateDialog = true;
+    }
+
+    private async Task CreateUser()
+    {
+        if (string.IsNullOrWhiteSpace(newUserName) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Vyplňte uživatelské jméno a heslo",
+                Duration = 3000
+            });
+            return;
+        }
+
+        isSaving = true;
+        var user = new ApplicationUser
+        {
+            UserName = newUserName,
+            Email = string.IsNullOrWhiteSpace(newEmail) ? $"{newUserName}@furniture.local" : newEmail,
+            EmailConfirmed = true
+        };
+
+        var result = await UserManager.CreateAsync(user, newPassword);
+        if (result.Succeeded)
+        {
+            if (!string.IsNullOrWhiteSpace(newRole))
+                await UserManager.AddToRoleAsync(user, newRole);
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Úspěch",
+                Detail = $"Uživatel {newUserName} byl vytvořen",
+                Duration = 3000
+            });
+            showCreateDialog = false;
+            await LoadUsers();
+        }
+        else
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba",
+                Detail = errors,
+                Duration = 5000
+            });
+        }
+        isSaving = false;
+    }
+
+    private void OpenRolesDialog(UserViewModel user)
+    {
+        selectedUser = user;
+        showRolesDialog = true;
+    }
+
+    private async Task ToggleRole(UserViewModel userVm, string role, bool add)
+    {
+        var user = await UserManager.FindByIdAsync(userVm.Id);
+        if (user == null) return;
+
+        if (add)
+        {
+            await UserManager.AddToRoleAsync(user, role);
+            userVm.Roles.Add(role);
+        }
+        else
+        {
+            await UserManager.RemoveFromRoleAsync(user, role);
+            userVm.Roles.Remove(role);
+        }
+
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Role aktualizována",
+            Detail = $"{(add ? "Přidána" : "Odebrána")} role {role}",
+            Duration = 2000
+        });
+    }
+
+    private async Task DeleteUser(UserViewModel userVm)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Opravdu chcete smazat uživatele {userVm.UserName}?",
+            "Potvrzení smazání",
+            new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
+        );
+
+        if (confirmed == true)
+        {
+            var user = await UserManager.FindByIdAsync(userVm.Id);
+            if (user != null)
+            {
+                await UserManager.DeleteAsync(user);
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Úspěch",
+                    Detail = $"Uživatel {userVm.UserName} byl smazán",
+                    Duration = 3000
+                });
+                await LoadUsers();
+            }
+        }
+    }
+
+    private BadgeStyle GetRoleBadgeStyle(string role) => role switch
+    {
+        "Admin" => BadgeStyle.Danger,
+        "Manager" => BadgeStyle.Primary,
+        "Warehouse" => BadgeStyle.Success,
+        _ => BadgeStyle.Light
+    };
+
+    private class UserViewModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public List<string> Roles { get; set; } = new();
+    }
+}

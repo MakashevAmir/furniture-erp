@@ -5,6 +5,7 @@ using FurnitureERP.Data;
 using FurnitureERP.Infrastructure;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Radzen;
 
@@ -52,6 +53,7 @@ namespace FurnitureERP
                     options.Password.RequireNonAlphanumeric = false;
                     options.Password.RequiredLength = 4;
                 })
+                .AddRoles<IdentityRole>()
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddSignInManager()
                 .AddDefaultTokenProviders();
@@ -96,6 +98,13 @@ namespace FurnitureERP
                 var identityContext = services.GetRequiredService<ApplicationDbContext>();
                 await identityContext.Database.EnsureCreatedAsync();
 
+                var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+                foreach (var role in new[] { "Admin", "Manager", "Warehouse", "Owner" })
+                {
+                    if (!await roleManager.RoleExistsAsync(role))
+                        await roleManager.CreateAsync(new IdentityRole(role));
+                }
+
                 var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
                 var adminEmail = "admin@furniture.local";
                 var adminUser = await userManager.FindByEmailAsync(adminEmail);
@@ -108,9 +117,11 @@ namespace FurnitureERP
                         Email = adminEmail,
                         EmailConfirmed = true
                     };
-
                     await userManager.CreateAsync(adminUser, "admin");
                 }
+
+                if (!await userManager.IsInRoleAsync(adminUser, "Admin"))
+                    await userManager.AddToRoleAsync(adminUser, "Admin");
 
                 var businessContext = services.GetRequiredService<FurnitureERP.Infrastructure.Persistence.ApplicationDbContext>();
                 await businessContext.Database.MigrateAsync();

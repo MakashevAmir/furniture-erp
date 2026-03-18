@@ -27,14 +27,28 @@
                     </RadzenStack>
                 </RadzenStack>
             </RadzenHeader>
-            <RadzenSidebar @bind-Expanded="@sidebarExpanded" Style="background: #1e1e2d;">
+            <RadzenSidebar Expanded="@sidebarExpanded" Style="background: #1e1e2d;">
                 <RadzenPanelMenu Style="background: transparent;">
-                    <RadzenPanelMenuItem Text="Přehled" Icon="dashboard" Path="/" />
-                    <RadzenPanelMenuItem Text="Produkty" Icon="inventory_2" Path="/products" />
-                    <RadzenPanelMenuItem Text="Materiály" Icon="category" Path="/materials" />
-                    <RadzenPanelMenuItem Text="Objednávky" Icon="shopping_cart" Path="/orders" />
-                    <RadzenPanelMenuItem Text="Zaměstnanci" Icon="people" Path="/employees" />
-                    <RadzenPanelMenuItem Text="Prognóza zásob" Icon="trending_down" Path="/forecast" />
+                    <RadzenPanelMenuItem Text="Přehled" Icon="dashboard" Path="/" Match="NavLinkMatch.All" />
+                    <AuthorizeView Roles="Admin,Owner" Context="ownerCtx">
+                        <RadzenPanelMenuItem Text="Přehled vlastníka" Icon="analytics" Path="/owner" />
+                    </AuthorizeView>
+                    <AuthorizeView Roles="Admin,Manager" Context="managerCtx">
+                        <RadzenPanelMenuItem Text="Produkty" Icon="inventory_2" Path="/products" />
+                    </AuthorizeView>
+                    <AuthorizeView Roles="Admin,Manager,Warehouse" Context="warehouseCtx">
+                        <RadzenPanelMenuItem Text="Materiály" Icon="category" Path="/materials" />
+                    </AuthorizeView>
+                    <AuthorizeView Roles="Admin,Manager" Context="ordersCtx">
+                        <RadzenPanelMenuItem Text="Objednávky" Icon="shopping_cart" Path="/orders" />
+                        <RadzenPanelMenuItem Text="Zaměstnanci" Icon="people" Path="/employees" />
+                    </AuthorizeView>
+                    <AuthorizeView Roles="Admin,Manager,Warehouse" Context="forecastCtx">
+                        <RadzenPanelMenuItem Text="Prognóza zásob" Icon="trending_down" Path="/forecast" />
+                    </AuthorizeView>
+                    <AuthorizeView Roles="Admin" Context="adminCtx">
+                        <RadzenPanelMenuItem Text="Uživatelé" Icon="manage_accounts" Path="/users" />
+                    </AuthorizeView>
                 </RadzenPanelMenu>
             </RadzenSidebar>
             <RadzenBody>
@@ -60,5 +74,5 @@
 </div>
 
 @code {
-    private bool sidebarExpanded = true;
+    private bool sidebarExpanded = false;
 }
