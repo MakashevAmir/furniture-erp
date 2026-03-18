@@ -27,6 +27,8 @@ public class ApplicationDbContext : DbContext, IUnitOfWork
 
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
+    public DbSet<StockTransaction> StockTransactions => Set<StockTransaction>();
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
     {

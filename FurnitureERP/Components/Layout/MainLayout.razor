@@ -38,6 +38,7 @@
                     </AuthorizeView>
                     <AuthorizeView Roles="Admin,Manager,Warehouse" Context="warehouseCtx">
                         <RadzenPanelMenuItem Text="Materiály" Icon="category" Path="/materials" />
+                        <RadzenPanelMenuItem Text="Historie skladu" Icon="history" Path="/stock-history" />
                     </AuthorizeView>
                     <AuthorizeView Roles="Admin,Manager" Context="ordersCtx">
                         <RadzenPanelMenuItem Text="Objednávky" Icon="shopping_cart" Path="/orders" />

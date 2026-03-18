@@ -4,6 +4,7 @@
 @using MediatR
 @using FurnitureERP.Application.Materials.Queries.GetMaterials
 @using FurnitureERP.Application.Materials.Commands.DeleteMaterial
+@using FurnitureERP.Application.Materials.Commands.ReceiveMaterialStock
 @using FurnitureERP.Application.Materials.DTOs
 @rendermode InteractiveServer
 @inject IMediator Mediator
@@ -120,6 +121,11 @@
                                       Sortable="false">
                     <Template Context="material">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Icon="add_box"
+                                          ButtonStyle="ButtonStyle.Success"
+                                          Size="ButtonSize.Small"
+                                          Click="@(() => OpenReceiveDialog(material))"
+                                          title="Příjem na sklad" />
                             <RadzenButton Icon="edit"
                                           ButtonStyle="ButtonStyle.Light"
                                           Size="ButtonSize.Small"
@@ -137,6 +143,34 @@
         </RadzenDataGrid>
     </RadzenCard>
 </RadzenStack>
+
+@if (showReceiveDialog && receivingMaterial != null)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <RadzenCard style="min-width: 380px; padding: 2rem;">
+            <RadzenText TextStyle="TextStyle.H6" style="margin-bottom: 1rem;">
+                Příjem na sklad — @receivingMaterial.Name
+            </RadzenText>
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Body2" style="color: gray;">
+                    Aktuální stav: @receivingMaterial.CurrentStock.ToString("N2") @receivingMaterial.Unit
+                </RadzenText>
+                <RadzenFormField Text="Přijaté množství" Variant="Variant.Outlined">
+                    <RadzenNumeric @bind-Value="receiveQuantity" TValue="decimal" Min="0.01m" Style="width: 100%;" />
+                </RadzenFormField>
+                <RadzenFormField Text="Poznámka" Variant="Variant.Outlined">
+                    <RadzenTextBox @bind-Value="receiveNotes" Placeholder="Dodavatel, číslo faktury..." />
+                </RadzenFormField>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                    <RadzenButton Text="Potvrdit příjem" ButtonStyle="ButtonStyle.Success"
+                                  Icon="check" Click="@ConfirmReceive" IsBusy="@isReceiving" />
+                    <RadzenButton Text="Zrušit" ButtonStyle="ButtonStyle.Light"
+                                  Click="@(() => showReceiveDialog = false)" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+    </div>
+}
 
 @code {
     private RadzenDataGrid<MaterialDto>? grid;
@@ -279,5 +313,70 @@
             return "color: #d32f2f; font-weight: bold;";
         }
         return string.Empty;
+    }
+
+    // ===== Příjem na sklad =====
+    private bool showReceiveDialog = false;
+    private MaterialDto? receivingMaterial;
+    private decimal receiveQuantity = 0;
+    private string receiveNotes = string.Empty;
+    private bool isReceiving = false;
+
+    private void OpenReceiveDialog(MaterialDto material)
+    {
+        receivingMaterial = material;
+        receiveQuantity = 0;
+        receiveNotes = string.Empty;
+        showReceiveDialog = true;
+    }
+
+    private async Task ConfirmReceive()
+    {
+        if (receivingMaterial == null || receiveQuantity <= 0)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Upozornění",
+                Detail = "Zadejte kladné množství",
+                Duration = 3000
+            });
+            return;
+        }
+
+        try
+        {
+            isReceiving = true;
+            await Mediator.Send(new ReceiveMaterialStockCommand(
+                receivingMaterial.Id,
+                receiveQuantity,
+                receiveNotes));
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Příjem potvrzen",
+                Detail = $"Přijato {receiveQuantity:N2} {receivingMaterial.Unit} materiálu {receivingMaterial.Name}",
+                Duration = 3000
+            });
+
+            showReceiveDialog = false;
+            await LoadMaterials();
+            await grid!.Reload();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba příjmu",
+                Detail = ex.Message,
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isReceiving = false;
+        }
     }
 }

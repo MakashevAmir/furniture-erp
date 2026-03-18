@@ -1,0 +1,175 @@
+@page "/stock-history"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin,Manager,Warehouse")]
+@using MediatR
+@using FurnitureERP.Application.Materials.DTOs
+@using FurnitureERP.Application.Materials.Queries.GetStockHistory
+@using FurnitureERP.Application.Materials.Queries.GetMaterials
+@using FurnitureERP.Domain.Aggregates.Materials
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NotificationService NotificationService
+
+<PageTitle>Historie skladu - FurnitureERP</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
+                Historie skladu
+            </RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" style="color: gray;">
+                Přehled všech pohybů materiálů
+            </RadzenText>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard>
+        <RadzenRow Gap="1rem" AlignItems="AlignItems.End" style="margin-bottom: 1rem;">
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenLabel Text="Materiál" />
+                <RadzenDropDown @bind-Value="filterMaterialId"
+                                Data="@materialOptions"
+                                TextProperty="Text"
+                                ValueProperty="Value"
+                                Style="width: 100%;"
+                                Placeholder="Všechny materiály" />
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenLabel Text="Od" />
+                <RadzenDatePicker @bind-Value="filterDateFrom" Style="width: 100%;" DateFormat="dd.MM.yyyy" />
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenLabel Text="Do" />
+                <RadzenDatePicker @bind-Value="filterDateTo" Style="width: 100%;" DateFormat="dd.MM.yyyy" />
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="2">
+                <RadzenButton Text="Filtrovat" Icon="search" ButtonStyle="ButtonStyle.Primary"
+                              Click="@LoadHistory" Style="width: 100%;" />
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenDataGrid Data="@transactions" TItem="StockTransactionDto"
+                        AllowSorting="true" AllowPaging="true" PageSize="25"
+                        IsLoading="@isLoading" ShowPagingSummary="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="TransactionDate" Title="Datum" Width="160px">
+                    <Template Context="t">
+                        @t.TransactionDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="MaterialName" Title="Materiál" Width="180px" />
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="TypeLabel" Title="Typ" Width="160px">
+                    <Template Context="t">
+                        <RadzenBadge BadgeStyle="@GetTypeBadgeStyle(t.Type)" Text="@t.TypeLabel" />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="Quantity" Title="Změna" Width="130px">
+                    <Template Context="t">
+                        <span style="font-weight: bold; color: @(t.Quantity > 0 ? "#4caf50" : "#f44336")">
+                            @(t.Quantity > 0 ? "+" : "")@t.Quantity.ToString("N2") @t.MaterialUnit
+                        </span>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="StockBefore" Title="Před" Width="120px">
+                    <Template Context="t">
+                        @t.StockBefore.ToString("N2") @t.MaterialUnit
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="StockAfter" Title="Po" Width="120px">
+                    <Template Context="t">
+                        <span style="font-weight: bold;">@t.StockAfter.ToString("N2") @t.MaterialUnit</span>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="Reference" Title="Zakázka" Width="130px">
+                    <Template Context="t">
+                        @if (!string.IsNullOrEmpty(t.Reference))
+                        {
+                            <span style="font-family: monospace;">@t.Reference</span>
+                        }
+                        else
+                        {
+                            <span style="color: gray;">—</span>
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="Notes" Title="Poznámka" />
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private List<StockTransactionDto> transactions = new();
+    private bool isLoading = false;
+
+    private int? filterMaterialId;
+    private DateTime? filterDateFrom;
+    private DateTime? filterDateTo;
+
+    private List<MaterialOption> materialOptions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMaterialOptions();
+        await LoadHistory();
+    }
+
+    private async Task LoadMaterialOptions()
+    {
+        var result = await Mediator.Send(new GetMaterialsQuery());
+        materialOptions = result
+            .OrderBy(m => m.Name)
+            .Select(m => new MaterialOption { Value = m.Id, Text = m.Name })
+            .ToList();
+    }
+
+    private async Task LoadHistory()
+    {
+        try
+        {
+            isLoading = true;
+            var result = await Mediator.Send(new GetStockHistoryQuery(
+                MaterialId: filterMaterialId,
+                DateFrom: filterDateFrom,
+                DateTo: filterDateTo));
+            transactions = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba načítání",
+                Detail = ex.Message,
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private BadgeStyle GetTypeBadgeStyle(StockTransactionType type) => type switch
+    {
+        StockTransactionType.Purchase => BadgeStyle.Success,
+        StockTransactionType.OrderConsumption => BadgeStyle.Danger,
+        StockTransactionType.ManualAdjustment => BadgeStyle.Warning,
+        StockTransactionType.InitialStock => BadgeStyle.Light,
+        _ => BadgeStyle.Light
+    };
+
+    private class MaterialOption
+    {
+        public int Value { get; set; }
+        public string Text { get; set; } = string.Empty;
+    }
+}
