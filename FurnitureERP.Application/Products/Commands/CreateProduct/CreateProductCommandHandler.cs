@@ -32,6 +32,8 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             request.SalePrice
         );
 
+        product.SetProductionDays(request.ProductionDays);
+
         await _productRepository.AddAsync(product, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

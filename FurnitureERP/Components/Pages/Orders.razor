@@ -327,15 +327,29 @@
             try
             {
                 var command = new ConfirmOrderCommand(orderId);
-                await Mediator.Send(command);
+                var result = await Mediator.Send(command);
 
-                NotificationService.Notify(new NotificationMessage
+                var completionStr = result.CalculatedCompletionDate.ToString("dd.MM.yyyy");
+                if (result.MaterialsAvailable)
                 {
-                    Severity = NotificationSeverity.Success,
-                    Summary = "Úspěch",
-                    Detail = "Objednávka byla úspěšně potvrzena",
-                    Duration = 3000
-                });
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Objednávka potvrzena",
+                        Detail = $"Výroba zahájena. Plánované dokončení: {completionStr}",
+                        Duration = 4000
+                    });
+                }
+                else
+                {
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Warning,
+                        Summary = "Potvrzeno – čeká na materiál",
+                        Detail = $"Nedostatek materiálů, výroba začne v pondělí. Dokončení: {completionStr}. ({result.MaterialShortageDetails})",
+                        Duration = 8000
+                    });
+                }
 
                 await LoadOrders();
                 await grid!.Reload();

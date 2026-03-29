@@ -12,6 +12,7 @@ public record UpdateProductCommand(
     decimal BasePrice,
     decimal SalePrice,
     bool IsActive,
+    int ProductionDays = 1,
     List<CreateMaterialBomDto>? Materials = null,
     List<CreateLaborBomDto>? LaborOperations = null
 ) : IRequest;

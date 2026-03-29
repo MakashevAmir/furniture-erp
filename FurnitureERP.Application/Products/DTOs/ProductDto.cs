@@ -9,6 +9,7 @@ public record ProductDto(
     decimal BasePrice,
     decimal SalePrice,
     bool IsActive,
+    int ProductionDays = 1,
     List<MaterialBomDto>? MaterialBoms = null,
     List<LaborBomDto>? LaborBoms = null
 );

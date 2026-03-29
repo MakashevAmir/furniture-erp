@@ -37,6 +37,8 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand>
             request.SalePrice
         );
 
+        product.SetProductionDays(request.ProductionDays);
+
         if (request.IsActive && !product.IsActive)
             product.Activate();
         else if (!request.IsActive && product.IsActive)

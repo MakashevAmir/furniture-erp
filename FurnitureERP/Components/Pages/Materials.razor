@@ -299,10 +299,9 @@
 
     private void OnRowRender(RowRenderEventArgs<MaterialDto> args)
     {
-        // Highlight rows with low stock in light red
         if (args.Data.CurrentStock < args.Data.MinimumStock)
         {
-            args.Attributes.Add("style", "background-color: #ffe6e6;");
+            args.Attributes.Add("class", "row-low-stock");
         }
     }
 

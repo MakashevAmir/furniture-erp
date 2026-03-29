@@ -128,8 +128,9 @@ h1:focus {
 /* ===== DataGrid improvements ===== */
 .rz-datatable {
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
 }
 
 .rz-datatable-header {
@@ -139,6 +140,25 @@ h1:focus {
 
 .rz-datatable-data tr:hover {
     background-color: #f0f4f8;
+}
+
+/* Перенос текста и отступы в ячейках */
+.rz-datatable-data td {
+    white-space: normal !important;
+    word-break: break-word;
+    vertical-align: middle;
+    padding: 10px 16px !important;
+}
+
+/* Подсветка строк с низким запасом */
+.rz-datatable-data tr.row-low-stock td {
+    background-color: #ffe6e6 !important;
+}
+
+/* Отступы в заголовках */
+.rz-datatable-thead th {
+    white-space: nowrap;
+    padding: 10px 16px !important;
 }
 
 /* ===== Buttons ===== */

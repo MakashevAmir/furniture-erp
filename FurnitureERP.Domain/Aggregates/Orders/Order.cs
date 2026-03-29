@@ -105,13 +105,16 @@ public class Order : AggregateRoot
         MarkAsUpdated();
     }
 
-    public void ConfirmOrder()
+    public void ConfirmOrder(DateTime? calculatedCompletionDate = null)
     {
         if (Status != OrderStatus.Pending)
             throw new DomainException($"Nelze potvrdit objednávku se stavem {Status}");
 
         if (!_orderItems.Any())
             throw new DomainException("Nelze potvrdit objednávku bez položek");
+
+        if (calculatedCompletionDate.HasValue)
+            ExpectedCompletionDate = calculatedCompletionDate.Value;
 
         Status = OrderStatus.InProduction;
         MarkAsUpdated();

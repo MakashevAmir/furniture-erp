@@ -1,12 +1,12 @@
 using FurnitureERP.Application.Common.Exceptions;
+using FurnitureERP.Application.Common.Services;
 using FurnitureERP.Application.Interfaces;
-using FurnitureERP.Domain.Exceptions;
 using FurnitureERP.Domain.Repositories;
 using MediatR;
 
 namespace FurnitureERP.Application.Orders.Commands.ConfirmOrder;
 
-public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand>
+public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, ConfirmOrderResult>
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IProductRepository _productRepository;
@@ -25,7 +25,7 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand>
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
 
-    public async Task Handle(ConfirmOrderCommand request, CancellationToken cancellationToken)
+    public async Task<ConfirmOrderResult> Handle(ConfirmOrderCommand request, CancellationToken cancellationToken)
     {
         if (request == null)
             throw new ArgumentNullException(nameof(request));
@@ -34,55 +34,50 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand>
         if (order == null)
             throw new NotFoundException($"Objednávka s ID {request.OrderId} nebyla nalezena");
 
-        await CheckMaterialAvailabilityAsync(order.OrderItems, cancellationToken);
+        var (materialsAvailable, shortageDetails) =
+            await CheckMaterialAvailabilityAsync(order.OrderItems, cancellationToken);
 
-        order.ConfirmOrder();
+        var productionDays = await CalculateMaxProductionDaysAsync(order.OrderItems, cancellationToken);
+
+        var today = DateTime.UtcNow.Date;
+        var startDate = materialsAvailable ? today : WorkingDaysCalculator.GetNextDeliveryMonday(today);
+        var completionDate = WorkingDaysCalculator.AddWorkingDays(startDate, productionDays);
+
+        order.ConfirmOrder(completionDate);
 
         _orderRepository.Update(order);
-
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new ConfirmOrderResult(materialsAvailable, completionDate, shortageDetails);
     }
 
-    private async Task CheckMaterialAvailabilityAsync(
+    private async Task<(bool materialsAvailable, string? shortageDetails)> CheckMaterialAvailabilityAsync(
         IEnumerable<Domain.Aggregates.Orders.OrderItem> orderItems,
         CancellationToken cancellationToken)
     {
-        // Aggregate total required quantity per material across all order items
         var requiredByMaterial = new Dictionary<int, decimal>();
 
-        var productTasks = orderItems
-            .Select(item => _productRepository.GetByIdAsync(item.ProductId, cancellationToken))
-            .ToList();
-
-        var products = await Task.WhenAll(productTasks);
-
-        foreach (var (orderItem, product) in orderItems.Zip(products))
+        foreach (var item in orderItems)
         {
+            var product = await _productRepository.GetByIdAsync(item.ProductId, cancellationToken);
             if (product == null)
                 continue;
 
             foreach (var bom in product.MaterialBoms)
             {
-                var totalRequired = bom.QuantityWithWastage * orderItem.Quantity;
-                requiredByMaterial[bom.MaterialId] = requiredByMaterial.GetValueOrDefault(bom.MaterialId) + totalRequired;
+                var totalRequired = bom.QuantityWithWastage * item.Quantity;
+                requiredByMaterial[bom.MaterialId] =
+                    requiredByMaterial.GetValueOrDefault(bom.MaterialId) + totalRequired;
             }
         }
 
         if (requiredByMaterial.Count == 0)
-            return;
-
-        // Load all needed materials in parallel
-        var materialTasks = requiredByMaterial.Keys
-            .Select(id => _materialRepository.GetByIdAsync(id, cancellationToken))
-            .ToList();
-
-        var materials = await Task.WhenAll(materialTasks);
+            return (true, null);
 
         var shortages = new List<string>();
-
         foreach (var (materialId, requiredQty) in requiredByMaterial)
         {
-            var material = materials.FirstOrDefault(m => m?.Id == materialId);
+            var material = await _materialRepository.GetByIdAsync(materialId, cancellationToken);
             if (material == null)
                 continue;
 
@@ -94,10 +89,22 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand>
             }
         }
 
-        if (shortages.Count > 0)
+        return shortages.Count == 0
+            ? (true, null)
+            : (false, string.Join("; ", shortages));
+    }
+
+    private async Task<int> CalculateMaxProductionDaysAsync(
+        IEnumerable<Domain.Aggregates.Orders.OrderItem> orderItems,
+        CancellationToken cancellationToken)
+    {
+        var maxDays = 1;
+        foreach (var item in orderItems)
         {
-            var detail = string.Join("; ", shortages);
-            throw new DomainException($"Nedostatek materiálů pro výrobu: {detail}");
+            var product = await _productRepository.GetByIdAsync(item.ProductId, cancellationToken);
+            if (product != null && product.ProductionDays > maxDays)
+                maxDays = product.ProductionDays;
         }
+        return maxDays;
     }
 }

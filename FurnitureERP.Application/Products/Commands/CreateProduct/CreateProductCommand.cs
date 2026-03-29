@@ -9,6 +9,7 @@ public record CreateProductCommand(
     string Article,
     decimal BasePrice,
     decimal SalePrice,
+    int ProductionDays = 1,
     List<CreateMaterialBomDto>? Materials = null,
     List<CreateLaborBomDto>? LaborOperations = null
 ) : IRequest<int>;

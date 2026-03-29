@@ -19,6 +19,9 @@ public class Product : AggregateRoot
 
     public bool IsActive { get; private set; }
 
+    /// <summary>Počet pracovních dnů potřebných k výrobě jednoho kusu.</summary>
+    public int ProductionDays { get; private set; }
+
     private readonly List<MaterialBom> _materialBoms = new();
     private readonly List<LaborBom> _laborBoms = new();
 
@@ -61,6 +64,7 @@ public class Product : AggregateRoot
         BasePrice = basePrice;
         SalePrice = salePrice;
         IsActive = true;
+        ProductionDays = 1;
 
         AddDomainEvent(new ProductCreatedEvent(Id, Name, Article));
     }
@@ -106,6 +110,15 @@ public class Product : AggregateRoot
             throw new DomainException($"Výrobek '{Name}' je již aktivní");
 
         IsActive = true;
+        MarkAsUpdated();
+    }
+
+    public void SetProductionDays(int days)
+    {
+        if (days < 1)
+            throw new InvalidProductDataException($"Počet výrobních dnů musí být alespoň 1, získáno: {days}");
+
+        ProductionDays = days;
         MarkAsUpdated();
     }
 

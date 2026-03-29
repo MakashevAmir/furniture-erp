@@ -38,6 +38,10 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(p => p.ProductionDays)
+            .IsRequired()
+            .HasDefaultValue(1);
+
         builder.Property(p => p.CreatedAt)
             .IsRequired();
 
