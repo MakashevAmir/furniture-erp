@@ -16,109 +16,167 @@
     <RadzenRow AlignItems="AlignItems.Center">
         <RadzenColumn Size="12" SizeMD="6">
             <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">
-                Správa zaměstnanců
+                Zaměstnanci
             </RadzenText>
         </RadzenColumn>
         <RadzenColumn Size="12" SizeMD="6" class="rz-text-align-md-end">
             <RadzenButton Icon="add_circle_outline"
-                          Text="Vytvořit zaměstnance"
+                          Text="Přidat zaměstnance"
                           Click="@CreateEmployee"
                           ButtonStyle="ButtonStyle.Primary" />
         </RadzenColumn>
     </RadzenRow>
 
-    <RadzenCard>
-        <RadzenDataGrid @ref="grid"
-                        Data="@employees"
-                        TItem="EmployeeDto"
-                        AllowFiltering="true"
-                        AllowSorting="true"
-                        AllowPaging="true"
-                        PageSize="15"
-                        FilterMode="FilterMode.Simple"
-                        IsLoading="@isLoading"
-                        LoadData="@LoadData">
-            <Columns>
-                <RadzenDataGridColumn TItem="EmployeeDto"
-                                      Property="FullName"
-                                      Title="Celé jméno"
-                                      Width="250px" />
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else
+    {
+        @* Souhrnné karty kapacity *@
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenCard style="text-align:center; padding: 1rem;">
+                    <RadzenText TextStyle="TextStyle.H4" style="margin:0; color: var(--rz-primary)">
+                        @activeEmployees.Count
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" style="color: var(--rz-text-secondary-color)">
+                        aktivních zaměstnanců
+                    </RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenCard style="text-align:center; padding: 1rem;">
+                    <RadzenText TextStyle="TextStyle.H4" style="margin:0; color: var(--rz-success)">
+                        @(activeEmployees.Count * 8) h/den
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" style="color: var(--rz-text-secondary-color)">
+                        celková denní kapacita
+                    </RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenCard style="text-align:center; padding: 1rem;">
+                    <RadzenText TextStyle="TextStyle.H4" style="margin:0; color: var(--rz-warning)">
+                        @groups.Count
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" style="color: var(--rz-text-secondary-color)">
+                        pracovních rolí
+                    </RadzenText>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
 
-                <RadzenDataGridColumn TItem="EmployeeDto"
-                                      Property="Position"
-                                      Title="Pozice"
-                                      Width="200px">
-                    <FilterTemplate>
-                        <RadzenDropDown @bind-Value="@selectedPosition"
-                                        Data="@positions"
-                                        AllowClear="true"
-                                        Placeholder="Všechny pozice"
-                                        Change="@(() => grid!.Reload())"
-                                        Style="width: 100%;" />
-                    </FilterTemplate>
-                </RadzenDataGridColumn>
+        @* Skupiny podle pozice *@
+        @foreach (var group in groups)
+        {
+            var activeInGroup = group.Value.Where(e => e.IsActive).ToList();
+            var totalInGroup = group.Value.Count;
 
-                <RadzenDataGridColumn TItem="EmployeeDto"
-                                      Property="HourlyRate"
-                                      Title="Hodinová sazba (Kč)"
-                                      Width="150px">
-                    <Template Context="employee">
-                        @employee.HourlyRate.ToString("N2") Kč
-                    </Template>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="EmployeeDto"
-                                      Property="IsActive"
-                                      Title="Stav"
-                                      Width="100px"
-                                      Filterable="false"
-                                      Sortable="false">
-                    <Template Context="employee">
-                        <RadzenBadge BadgeStyle="@(employee.IsActive ? BadgeStyle.Success : BadgeStyle.Danger)"
-                                     Text="@(employee.IsActive ? "Aktivní" : "Neaktivní")" />
-                    </Template>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="EmployeeDto"
-                                      Title="Akce"
-                                      Width="180px"
-                                      Filterable="false"
-                                      Sortable="false">
-                    <Template Context="employee">
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Icon="edit"
-                                          ButtonStyle="ButtonStyle.Light"
-                                          Size="ButtonSize.Small"
-                                          Click="@(() => EditEmployee(employee.Id))"
-                                          title="Upravit" />
-                            <RadzenButton Icon="delete"
-                                          ButtonStyle="ButtonStyle.Danger"
-                                          Size="ButtonSize.Small"
-                                          Click="@(() => DeleteEmployee(employee.Id))"
-                                          title="Smazat" />
+            <RadzenCard>
+                <RadzenRow AlignItems="AlignItems.Center" style="margin-bottom: 0.75rem;">
+                    <RadzenColumn>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+                            <RadzenText TextStyle="TextStyle.H6" style="margin:0">
+                                @group.Key
+                            </RadzenText>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Primary"
+                                         Text="@($"{activeInGroup.Count} aktivních")" />
+                            @if (activeInGroup.Count != totalInGroup)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Light"
+                                             Text="@($"{totalInGroup - activeInGroup.Count} neaktivních")" />
+                            }
+                            <RadzenText TextStyle="TextStyle.Caption"
+                                        style="color: var(--rz-text-secondary-color); margin:0">
+                                @(activeInGroup.Count * 8) h/den
+                            </RadzenText>
                         </RadzenStack>
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    </RadzenCard>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenDataGrid Data="@group.Value"
+                                TItem="EmployeeDto"
+                                AllowPaging="false"
+                                AllowSorting="false"
+                                AllowFiltering="false"
+                                Style="border: none;">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="EmployeeDto"
+                                              Property="FullName"
+                                              Title="Jméno"
+                                              Width="220px" />
+
+                        <RadzenDataGridColumn TItem="EmployeeDto"
+                                              Property="HourlyRate"
+                                              Title="Sazba (Kč/h)"
+                                              Width="130px">
+                            <Template Context="emp">
+                                @emp.HourlyRate.ToString("N0") Kč
+                            </Template>
+                        </RadzenDataGridColumn>
+
+                        <RadzenDataGridColumn TItem="EmployeeDto"
+                                              Property="IsActive"
+                                              Title="Stav"
+                                              Width="100px">
+                            <Template Context="emp">
+                                <RadzenBadge BadgeStyle="@(emp.IsActive ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                             Text="@(emp.IsActive ? "Aktivní" : "Neaktivní")" />
+                            </Template>
+                        </RadzenDataGridColumn>
+
+                        <RadzenDataGridColumn TItem="EmployeeDto"
+                                              Title="Akce"
+                                              Width="150px"
+                                              Filterable="false"
+                                              Sortable="false">
+                            <Template Context="emp">
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                    <RadzenButton Icon="info"
+                                                  ButtonStyle="ButtonStyle.Info"
+                                                  Size="ButtonSize.Small"
+                                                  Click="@(() => ShowEmployeeDetail(emp))"
+                                                  title="Detail a zakázky" />
+                                    <RadzenButton Icon="edit"
+                                                  ButtonStyle="ButtonStyle.Light"
+                                                  Size="ButtonSize.Small"
+                                                  Click="@(() => EditEmployee(emp.Id))"
+                                                  title="Upravit" />
+                                    <RadzenButton Icon="delete"
+                                                  ButtonStyle="ButtonStyle.Danger"
+                                                  Size="ButtonSize.Small"
+                                                  Click="@(() => DeleteEmployee(emp.Id))"
+                                                  title="Smazat" />
+                                </RadzenStack>
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenCard>
+        }
+    }
 </RadzenStack>
 
 @code {
-    private RadzenDataGrid<EmployeeDto>? grid;
-    private List<EmployeeDto> employees = new();
     private List<EmployeeDto> allEmployees = new();
+    private List<EmployeeDto> activeEmployees = new();
+    private Dictionary<string, List<EmployeeDto>> groups = new();
     private bool isLoading = false;
-    private string? selectedPosition;
-    private List<string> positions = new();
+
+    private static readonly Dictionary<string, int> PositionOrder = new()
+    {
+        { "Mistr výroby",    0 },
+        { "Hlavní truhlář",  1 },
+        { "Truhlář",         2 },
+        { "Lakýrník",        3 },
+        { "Montážník",       4 },
+        { "Čalouník",        5 },
+        { "Skladník",        6 },
+        { "Řidič",           7 },
+    };
 
     protected override async Task OnInitializedAsync()
-    {
-        
-        await LoadEmployees();
-    }
-
-    private async Task LoadData(LoadDataArgs args)
     {
         await LoadEmployees();
     }
@@ -128,21 +186,14 @@
         try
         {
             isLoading = true;
-            var query = new GetEmployeesQuery();
-            var result = await Mediator.Send(query);
+            var result = await Mediator.Send(new GetEmployeesQuery());
             allEmployees = result.ToList();
+            activeEmployees = allEmployees.Where(e => e.IsActive).ToList();
 
-            // Extract unique positions for filter
-            positions = allEmployees
-                .Select(e => e.Position)
-                .Distinct()
-                .OrderBy(p => p)
-                .ToList();
-
-            // Apply position filter if selected
-            employees = string.IsNullOrEmpty(selectedPosition)
-                ? allEmployees
-                : allEmployees.Where(e => e.Position == selectedPosition).ToList();
+            groups = allEmployees
+                .GroupBy(e => e.Position)
+                .OrderBy(g => PositionOrder.TryGetValue(g.Key, out var o) ? o : 99)
+                .ToDictionary(g => g.Key, g => g.OrderBy(e => e.FullName).ToList());
         }
         catch (Exception ex)
         {
@@ -150,7 +201,7 @@
             {
                 Severity = NotificationSeverity.Error,
                 Summary = "Chyba načítání",
-                Detail = $"Nepodařilo se načíst seznam zaměstnanců: {ex.Message}",
+                Detail = ex.Message,
                 Duration = 4000
             });
         }
@@ -160,19 +211,25 @@
         }
     }
 
+    private async Task ShowEmployeeDetail(EmployeeDto emp)
+    {
+        await DialogService.OpenAsync<EmployeeDetailDialog>(
+            $"{emp.FullName} – detail",
+            new Dictionary<string, object> { ["EmployeeId"] = emp.Id },
+            new DialogOptions { Width = "750px", Height = "auto", Resizable = true, Draggable = true }
+        );
+    }
+
     private async Task CreateEmployee()
     {
         var result = await DialogService.OpenAsync<EmployeeEditDialog>(
-            "Vytvořit zaměstnance",
+            "Přidat zaměstnance",
             new Dictionary<string, object> { },
             new DialogOptions { Width = "600px", Height = "auto", Resizable = true, Draggable = true }
         );
 
         if (result == true)
-        {
             await LoadEmployees();
-            await grid!.Reload();
-        }
     }
 
     private async Task EditEmployee(int employeeId)
@@ -184,10 +241,7 @@
         );
 
         if (result == true)
-        {
             await LoadEmployees();
-            await grid!.Reload();
-        }
     }
 
     private async Task DeleteEmployee(int employeeId)
@@ -198,34 +252,29 @@
             new ConfirmOptions { OkButtonText = "Ano", CancelButtonText = "Ne" }
         );
 
-        if (confirmed == true)
+        if (confirmed != true) return;
+
+        try
         {
-            try
+            await Mediator.Send(new DeleteEmployeeCommand(employeeId));
+            NotificationService.Notify(new NotificationMessage
             {
-                var command = new DeleteEmployeeCommand(employeeId);
-                await Mediator.Send(command);
-
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Success,
-                    Summary = "Úspěch",
-                    Detail = "Zaměstnanec byl úspěšně smazán",
-                    Duration = 3000
-                });
-
-                await LoadEmployees();
-                await grid!.Reload();
-            }
-            catch (Exception ex)
+                Severity = NotificationSeverity.Success,
+                Summary = "Úspěch",
+                Detail = "Zaměstnanec byl smazán",
+                Duration = 3000
+            });
+            await LoadEmployees();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
             {
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "Chyba mazání",
-                    Detail = $"Nepodařilo se smazat zaměstnance: {ex.Message}",
-                    Duration = 4000
-                });
-            }
+                Severity = NotificationSeverity.Error,
+                Summary = "Chyba",
+                Detail = ex.Message,
+                Duration = 4000
+            });
         }
     }
 }

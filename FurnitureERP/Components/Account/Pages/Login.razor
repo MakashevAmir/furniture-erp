@@ -67,7 +67,7 @@
         </div>
 
         <div class="login-footer">
-            <p>Výchozí přihlašovací údaje: <strong>admin</strong> / <strong>admin</strong></p>
+            <p>Pro přístup kontaktujte správce systému.</p>
         </div>
     </div>
 </div>
@@ -175,7 +175,7 @@
 
     public async Task LoginUser()
     {
-        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, false, lockoutOnFailure: false);
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, false, lockoutOnFailure: true);
 
         if (result.Succeeded)
         {

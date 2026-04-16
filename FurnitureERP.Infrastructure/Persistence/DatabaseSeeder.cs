@@ -214,70 +214,39 @@ public class DatabaseSeeder
     {
         var employees = new List<Employee>
         {
-            new Employee(
-                "Jan",
-                "Novák",
-                "Hlavní truhlář",
-                350.00m
-            ),
-            new Employee(
-                "Petr",
-                "Svoboda",
-                "Truhlář",
-                280.00m
-            ),
-            new Employee(
-                "Pavel",
-                "Dvořák",
-                "Truhlář",
-                280.00m
-            ),
+            // Truhláři – výroba dřevěných konstrukcí
+            new Employee("Jan",      "Novák",      "Hlavní truhlář", 350.00m),
+            new Employee("Petr",     "Svoboda",    "Truhlář",        280.00m),
+            new Employee("Pavel",    "Dvořák",     "Truhlář",        280.00m),
+            new Employee("Tomáš",    "Kratochvíl", "Truhlář",        275.00m),
+            new Employee("Radek",    "Fiala",      "Truhlář",        270.00m),
 
-            new Employee(
-                "Martin",
-                "Černý",
-                "Montážník",
-                250.00m
-            ),
-            new Employee(
-                "Tomáš",
-                "Procházka",
-                "Montážník",
-                250.00m
-            ),
+            // Montážníci – sestavení a instalace kování
+            new Employee("Martin",   "Černý",      "Montážník",      250.00m),
+            new Employee("Lukáš",    "Procházka",  "Montážník",      250.00m),
+            new Employee("Ondřej",   "Šimánek",    "Montážník",      248.00m),
+            new Employee("David",    "Blažek",     "Montážník",      248.00m),
 
-            new Employee(
-                "Josef",
-                "Kučera",
-                "Lakýrník",
-                290.00m
-            ),
-            new Employee(
-                "Jaroslav",
-                "Veselý",
-                "Lakýrník",
-                290.00m
-            ),
+            // Lakýrníci – broušení, lakování, povrchová úprava
+            new Employee("Josef",    "Kučera",     "Lakýrník",       290.00m),
+            new Employee("Jaroslav", "Veselý",     "Lakýrník",       290.00m),
+            new Employee("Michal",   "Pospíšil",   "Lakýrník",       280.00m),
 
-            new Employee(
-                "Marie",
-                "Horáková",
-                "Čalouník",
-                270.00m
-            ),
-            new Employee(
-                "Anna",
-                "Němcová",
-                "Čalouník",
-                270.00m
-            ),
+            // Čalouníci – čalounění sedáků a opěradel
+            new Employee("Marie",    "Horáková",   "Čalouník",       270.00m),
+            new Employee("Anna",     "Němcová",    "Čalouník",       270.00m),
+            new Employee("Tereza",   "Kopecká",    "Čalouník",       265.00m),
 
-            new Employee(
-                "Jiří",
-                "Marek",
-                "Mistr výroby",
-                400.00m
-            )
+            // Mistr výroby – koordinace a kontrola kvality
+            new Employee("Jiří",     "Marek",      "Mistr výroby",   400.00m),
+
+            // Skladníci – příjem a výdej materiálu
+            new Employee("Vladimír", "Navrátil",   "Skladník",       220.00m),
+            new Employee("Roman",    "Sedláček",   "Skladník",       220.00m),
+
+            // Řidiči – rozvoz hotových výrobků
+            new Employee("Karel",    "Horák",      "Řidič",          230.00m),
+            new Employee("Zdeněk",   "Blaha",      "Řidič",          230.00m),
         };
 
         await _context.Employees.AddRangeAsync(employees);

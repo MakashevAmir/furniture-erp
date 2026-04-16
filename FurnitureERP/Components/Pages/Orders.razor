@@ -133,7 +133,10 @@
                                       Sortable="false">
                     <Template Context="order">
                         <RadzenText TextStyle="TextStyle.Body2">
-                            @order.OrderItems.Count ks
+                            @order.OrderItems.Sum(i => i.Quantity) ks
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" style="color: var(--rz-text-secondary-color)">
+                            @order.OrderItems.Count @(order.OrderItems.Count == 1 ? "druh" : "druhy/ů")
                         </RadzenText>
                     </Template>
                 </RadzenDataGridColumn>
