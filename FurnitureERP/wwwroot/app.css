@@ -213,32 +213,97 @@ h1:focus {
     margin-left: 0.5rem;
 }
 
+/* Primary */
 .rz-button.rz-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
     color: white !important;
 }
-
-.rz-button.rz-primary:hover {
-    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
-    color: white !important;
-}
-
-/* Кнопка Přihlásit se на login странице */
-.login-form .rz-button.rz-primary,
-.login-form .rz-button.rz-primary span,
-.login-form .rz-button.rz-primary .rzi {
-    color: white !important;
-}
-
-.login-form .rz-button.rz-primary:hover {
+.rz-button.rz-primary:hover,
+.rz-button.rz-primary:focus,
+.rz-button.rz-primary:active {
     background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%) !important;
     color: white !important;
 }
-
-.login-form .rz-button.rz-primary:hover span,
-.login-form .rz-button.rz-primary:hover .rzi {
+.rz-button.rz-primary span,
+.rz-button.rz-primary .rzi,
+.rz-button.rz-primary:hover span,
+.rz-button.rz-primary:hover .rzi {
     color: white !important;
+}
+
+/* Success */
+.rz-button.rz-success {
+    background-color: #43a047 !important;
+    border: none !important;
+    color: white !important;
+}
+.rz-button.rz-success:hover,
+.rz-button.rz-success:focus {
+    background-color: #388e3c !important;
+    color: white !important;
+}
+.rz-button.rz-success span,
+.rz-button.rz-success .rzi,
+.rz-button.rz-success:hover span,
+.rz-button.rz-success:hover .rzi {
+    color: white !important;
+}
+
+/* Danger */
+.rz-button.rz-danger {
+    background-color: #e53935 !important;
+    border: none !important;
+    color: white !important;
+}
+.rz-button.rz-danger:hover,
+.rz-button.rz-danger:focus {
+    background-color: #c62828 !important;
+    color: white !important;
+}
+.rz-button.rz-danger span,
+.rz-button.rz-danger .rzi,
+.rz-button.rz-danger:hover span,
+.rz-button.rz-danger:hover .rzi {
+    color: white !important;
+}
+
+/* Warning */
+.rz-button.rz-warning {
+    background-color: #fb8c00 !important;
+    border: none !important;
+    color: white !important;
+}
+.rz-button.rz-warning:hover,
+.rz-button.rz-warning:focus {
+    background-color: #e65100 !important;
+    color: white !important;
+}
+.rz-button.rz-warning span,
+.rz-button.rz-warning .rzi,
+.rz-button.rz-warning:hover span,
+.rz-button.rz-warning:hover .rzi {
+    color: white !important;
+}
+
+/* Light (на светлом фоне — тёмный текст) */
+.rz-button.rz-light {
+    background-color: #f0f0f0 !important;
+    border: 1px solid #ddd !important;
+    color: #333 !important;
+}
+.rz-button.rz-light:hover,
+.rz-button.rz-light:focus {
+    background-color: #e0e0e0 !important;
+    color: #111 !important;
+}
+.rz-button.rz-light span,
+.rz-button.rz-light .rzi {
+    color: #333 !important;
+}
+.rz-button.rz-light:hover span,
+.rz-button.rz-light:hover .rzi {
+    color: #111 !important;
 }
 
 /* Light button в header (на тёмном фоне) */
@@ -248,16 +313,17 @@ h1:focus {
     border-color: rgba(255,255,255,0.5) !important;
     background: transparent !important;
 }
-
 .rz-header .rz-button.rz-light:hover,
 .rz-header .rz-button.rz-secondary:hover {
     background: rgba(255,255,255,0.15) !important;
     color: white !important;
     border-color: rgba(255,255,255,0.8) !important;
 }
-
 .rz-header .rz-button .rzi,
-.rz-header .rz-button .rz-button-icon {
+.rz-header .rz-button .rz-button-icon,
+.rz-header .rz-button span,
+.rz-header .rz-button:hover span,
+.rz-header .rz-button:hover .rzi {
     color: white !important;
 }
 
