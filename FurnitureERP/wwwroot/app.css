@@ -89,24 +89,37 @@ h1:focus {
     background: transparent;
 }
 
-.rz-sidebar .rz-navigation-item-link {
+.rz-sidebar .rz-navigation-item-link,
+.rz-sidebar .rz-navigation-item-wrapper > .rz-navigation-item-link {
     color: rgba(255,255,255,0.8) !important;
     padding: 0.875rem 1rem;
     transition: all 0.2s ease;
+    background: transparent !important;
 }
 
-.rz-sidebar .rz-navigation-item-link:hover {
+.rz-sidebar .rz-navigation-item-link:hover,
+.rz-sidebar .rz-navigation-item-wrapper:hover > .rz-navigation-item-link,
+.rz-sidebar .rz-navigation-item-link.rz-state-focused,
+.rz-sidebar .rz-navigation-item-link:focus {
     background: rgba(255,255,255,0.1) !important;
     color: white !important;
 }
 
 .rz-sidebar .rz-navigation-item-link-active,
-.rz-sidebar .rz-navigation-item-link.active {
+.rz-sidebar .rz-navigation-item-link.active,
+.rz-sidebar .rz-navigation-item-link.rz-state-active {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
     color: white !important;
 }
 
-.rz-sidebar .rz-navigation-item-icon {
+/* Убираем белый фон который Radzen добавляет на hover через свои внутренние стили */
+.rz-sidebar .rz-navigation-item .rz-navigation-item-link:not(.rz-navigation-item-link-active):hover {
+    background-color: rgba(255,255,255,0.1) !important;
+    color: white !important;
+}
+
+.rz-sidebar .rz-navigation-item-icon,
+.rz-sidebar .rz-navigation-item-link .rzi {
     color: inherit !important;
     margin-right: 0.75rem;
 }
@@ -128,9 +141,20 @@ h1:focus {
 /* ===== DataGrid improvements ===== */
 .rz-datatable {
     border-radius: 12px;
-    overflow-x: auto;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     width: 100%;
+    min-width: 0;
+}
+
+.rz-datatable-wrapper {
+    overflow-x: auto !important;
+    width: 100%;
+}
+
+/* Колонки не сжимаются ниже своей Width */
+.rz-datatable table {
+    table-layout: fixed;
+    min-width: max-content;
 }
 
 .rz-datatable-header {
@@ -148,6 +172,29 @@ h1:focus {
     word-break: break-word;
     vertical-align: middle;
     padding: 10px 16px !important;
+}
+
+/* Иконка статуса в колонке прогнозы */
+.rz-datatable-data td.col-icon,
+.rz-datatable-thead th.col-icon {
+    padding-left: 12px !important;
+    padding-right: 4px !important;
+    overflow: visible !important;
+    clip-path: none !important;
+    text-align: center;
+}
+
+.forecast-status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.forecast-status-icon .rzi {
+    font-size: 1.25rem;
+    line-height: 1;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 /* Подсветка строк с низким запасом */
@@ -169,10 +216,29 @@ h1:focus {
 .rz-button.rz-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
+    color: white !important;
 }
 
 .rz-button.rz-primary:hover {
     background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+    color: white !important;
+}
+
+/* Кнопка Přihlásit se на login странице */
+.login-form .rz-button.rz-primary,
+.login-form .rz-button.rz-primary span,
+.login-form .rz-button.rz-primary .rzi {
+    color: white !important;
+}
+
+.login-form .rz-button.rz-primary:hover {
+    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%) !important;
+    color: white !important;
+}
+
+.login-form .rz-button.rz-primary:hover span,
+.login-form .rz-button.rz-primary:hover .rzi {
+    color: white !important;
 }
 
 /* Light button в header (на тёмном фоне) */
@@ -222,4 +288,7 @@ h1:focus {
     font-weight: 500;
     padding: 0.375rem 0.75rem;
     border-radius: 20px;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: visible;
 }

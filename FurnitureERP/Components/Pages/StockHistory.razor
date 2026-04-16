@@ -59,11 +59,16 @@
                     </Template>
                 </RadzenDataGridColumn>
 
-                <RadzenDataGridColumn TItem="StockTransactionDto" Property="MaterialName" Title="Materiál" Width="180px" />
-
-                <RadzenDataGridColumn TItem="StockTransactionDto" Property="TypeLabel" Title="Typ" Width="160px">
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="MaterialName" Title="Materiál" Width="220px" MinWidth="160px">
                     <Template Context="t">
-                        <RadzenBadge BadgeStyle="@GetTypeBadgeStyle(t.Type)" Text="@t.TypeLabel" />
+                        <span style="white-space: normal; word-break: break-word;">@t.MaterialName</span>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="TypeLabel" Title="Typ" Width="180px" MinWidth="180px">
+                    <Template Context="t">
+                        <RadzenBadge BadgeStyle="@GetTypeBadgeStyle(t.Type)" Text="@t.TypeLabel"
+                                     Style="white-space: nowrap;" />
                     </Template>
                 </RadzenDataGridColumn>
 
@@ -100,7 +105,18 @@
                     </Template>
                 </RadzenDataGridColumn>
 
-                <RadzenDataGridColumn TItem="StockTransactionDto" Property="Notes" Title="Poznámka" />
+                <RadzenDataGridColumn TItem="StockTransactionDto" Property="Notes" Title="Poznámka" Width="180px">
+                    <Template Context="t">
+                        @if (!string.IsNullOrEmpty(t.Notes))
+                        {
+                            <span style="white-space: normal; word-break: break-word;">@t.Notes</span>
+                        }
+                        else
+                        {
+                            <span style="color: gray;">—</span>
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
             </Columns>
         </RadzenDataGrid>
     </RadzenCard>

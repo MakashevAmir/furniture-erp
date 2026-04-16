@@ -8,6 +8,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject IMediator Mediator
+@inject NavigationManager Navigation
 
 <PageTitle>Dashboard - FurnitureERP</PageTitle>
 
@@ -153,31 +154,41 @@
             <RadzenColumn Size="12" SizeLG="4">
                 <RadzenCard>
                     <RadzenStack Gap="1rem">
-                        <RadzenText TextStyle="TextStyle.H5" Style="font-weight: bold; color: var(--rz-danger);">
-                            ⚠️ Nízké zásoby
-                        </RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                            <RadzenText TextStyle="TextStyle.H5" Style="font-weight: bold; color: var(--rz-danger); margin: 0;">
+                                ⚠️ Nízké zásoby
+                            </RadzenText>
+                            @if (lowStockCount > 0)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@lowStockCount.ToString()" />
+                            }
+                        </RadzenStack>
 
-                        @if (lowStockMaterials.Any())
+                        @if (lowStockPreview.Any())
                         {
-                            <RadzenDataList WrapItems="false" AllowPaging="false"
-                                            Data="@lowStockMaterials" TItem="MaterialDto">
-                                <Template Context="material">
-                                    <RadzenCard Style="margin-bottom: 0.5rem; padding: 0.75rem; background-color: var(--rz-danger-lighter);">
-                                        <RadzenStack Gap="0.25rem">
-                                            <RadzenText TextStyle="TextStyle.Body1" Style="font-weight: bold;">
-                                                @material.Name
-                                            </RadzenText>
-                                            <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--rz-text-secondary-color);">
-                                                @material.Category
-                                            </RadzenText>
-                                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-danger);">
-                                                Skladem: @material.CurrentStock.ToString("N2") @material.Unit
-                                                (Min: @material.MinimumStock.ToString("N2"))
-                                            </RadzenText>
-                                        </RadzenStack>
-                                    </RadzenCard>
-                                </Template>
-                            </RadzenDataList>
+                            @foreach (var material in lowStockPreview)
+                            {
+                                <RadzenCard Style="padding: 0.75rem; background-color: var(--rz-danger-lighter); margin-bottom: 0.25rem;">
+                                    <RadzenStack Gap="0.2rem">
+                                        <RadzenText TextStyle="TextStyle.Body1" Style="font-weight: bold; margin: 0;">
+                                            @material.Name
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2" Style="color: var(--rz-text-secondary-color); margin: 0;">
+                                            @material.Category
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-danger); margin: 0;">
+                                            Skladem: @material.CurrentStock.ToString("N2") @material.Unit
+                                            (Min: @material.MinimumStock.ToString("N2"))
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            }
+                            <RadzenButton Text="Zobrazit všechny zásoby"
+                                          Icon="inventory"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small"
+                                          Style="width: 100%; margin-top: 0.25rem;"
+                                          Click="@(() => Navigation.NavigateTo("/materials"))" />
                         }
                         else
                         {
@@ -287,6 +298,7 @@
     // Data
     private List<OrderDto> recentActiveOrders = new();
     private List<MaterialDto> lowStockMaterials = new();
+    private List<MaterialDto> lowStockPreview = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -336,6 +348,7 @@
             var lowStock = await Mediator.Send(lowStockQuery);
             lowStockMaterials = lowStock.ToList();
             lowStockCount = lowStockMaterials.Count;
+            lowStockPreview = lowStockMaterials.Take(3).ToList();
         }
         catch
         {

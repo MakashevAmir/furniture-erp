@@ -78,19 +78,22 @@
                         IsLoading="@isLoading"
                         RowRender="@OnRowRender">
             <Columns>
-                <RadzenDataGridColumn TItem="InventoryForecastDto" Title="" Width="40px" Sortable="false" Filterable="false">
+                <RadzenDataGridColumn TItem="InventoryForecastDto" Title="" Width="48px" MinWidth="48px" Sortable="false" Filterable="false" TextAlign="TextAlign.Center" CssClass="col-icon">
+                    <HeaderTemplate>
+                        <span></span>
+                    </HeaderTemplate>
                     <Template Context="item">
                         @if (item.HasShortfall)
                         {
-                            <RadzenIcon Icon="error" style="color: #f44336;" title="Kritický nedostatek" />
+                            <span style="color: #f44336; font-size: 1.1rem;" title="Kritický nedostatek">&#9888;</span>
                         }
                         else if (item.BelowMinimum)
                         {
-                            <RadzenIcon Icon="warning" style="color: #ff9800;" title="Pod minimem" />
+                            <span style="color: #ff9800; font-size: 1.1rem;" title="Pod minimem">&#9888;</span>
                         }
                         else
                         {
-                            <RadzenIcon Icon="check_circle" style="color: #4caf50;" title="V pořádku" />
+                            <span style="color: #4caf50; font-size: 1.1rem;" title="V pořádku">&#10003;</span>
                         }
                     </Template>
                 </RadzenDataGridColumn>
