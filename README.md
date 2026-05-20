@@ -20,6 +20,10 @@
 
 3. Otevřete prohlížeč na adrese `https://localhost:7188`
 
-4. Přihlaste se pomocí výchozích přihlašovacích údajů:
+4. Přihlaste se:
    - **Uživatel:** `admin`
-   - **Heslo:** `Admin@1234`
+   - **Heslo:** `admin`
+
+## Databáze
+
+Aplikace používá **SQLite** — databázové soubory jsou součástí projektu (`FurnitureERP.db`, `FurnitureERP-Business.db`). Žádná konfigurace připojení není potřeba.
