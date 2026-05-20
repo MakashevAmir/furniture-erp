@@ -26,4 +26,4 @@
 
 ## Databáze
 
-Aplikace používá **SQLite** — databázové soubory jsou součástí projektu (`FurnitureERP.db`, `FurnitureERP-Business.db`). Žádná konfigurace připojení není potřeba.
+Aplikace používá **SQLite** - databázové soubory jsou součástí projektu (`FurnitureERP.db`, `FurnitureERP-Business.db`). Žádná konfigurace připojení není potřeba.
