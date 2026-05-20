@@ -28,7 +28,6 @@ public class GetEmployeeWorkloadQueryHandler : IRequestHandler<GetEmployeeWorklo
         if (employee == null)
             throw new NotFoundException($"Zaměstnanec s ID {request.EmployeeId} nebyl nalezen");
 
-        // Velikost poolu: počet aktivních zaměstnanců se stejnou pozicí
         var poolSize = _employeeRepository
             .GetActiveEmployees()
             .Count(e => e.Position == employee.Position);
@@ -49,8 +48,6 @@ public class GetEmployeeWorkloadQueryHandler : IRequestHandler<GetEmployeeWorklo
                 if (product == null)
                     continue;
 
-                // LaborBomy pro pozici tohoto zaměstnance
-                // (práce se dělí mezi všechny zaměstnance se stejnou pozicí)
                 var employeeLaborBoms = product.LaborBoms
                     .Where(lb => lb.Position == employee.Position)
                     .ToList();

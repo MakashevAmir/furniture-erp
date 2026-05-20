@@ -47,17 +47,14 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, C
         var (materialsAvailable, shortageDetails) =
             await CheckMaterialAvailabilityAsync(order.OrderItems, products, cancellationToken);
 
-        // Kapacita pool per pozice: pozice → počet aktivních zaměstnanců × 8h/den
         var positionCapacity = _employeeRepository
             .GetActiveEmployees()
             .GroupBy(e => e.Position)
             .ToDictionary(g => g.Key, g => g.Count() * WorkingHoursPerDay);
 
-        // Backlog: hodiny zakázek aktuálně ve výrobě per pozice
         var backlogHoursByPosition = await CalculateBacklogByPositionAsync(
             request.OrderId, cancellationToken);
 
-        // Nová zakázka: hodiny per pozice
         var newOrderHoursByPosition = CalculateHoursByPosition(order.OrderItems, products);
 
         var today = DateTime.UtcNow.Date;
@@ -65,7 +62,6 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, C
             ? today
             : WorkingDaysCalculator.GetNextDeliveryMonday(today);
 
-        // Výsledný počet dní s paralelním/sekvenčním modelem
         var productionDays = CalculateScheduledDays(
             newOrderHoursByPosition, backlogHoursByPosition, positionCapacity);
 
@@ -78,10 +74,7 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, C
         return new ConfirmOrderResult(materialsAvailable, completionDate, shortageDetails);
     }
 
-    /// <summary>
-    /// Paralelní/sekvenční model: pokud zbývající kapacita v době backlogu pokryje novou zakázku,
-    /// pracuje se paralelně. Jinak se zbytek zařadí do fronty za backlog.
-    /// </summary>
+    // Určí termín dokončení zakázky s ohledem na aktuální backlog výroby.
     private static int CalculateScheduledDays(
         Dictionary<string, decimal> newOrderHours,
         Dictionary<string, decimal> backlogHours,
@@ -111,10 +104,7 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, C
         return Math.Max(1, maxDays);
     }
 
-    /// <summary>
-    /// Vypočítá počet pracovních dní pro daný soubor hodin per pozice (bottleneck model).
-    /// Výsledek = max přes všechny pozice ceil(hodiny / kapacita poolu).
-    /// </summary>
+    // Najde nejpomalejší pozici a vrátí odpovídající počet dní (bottleneck model).
     private static int CalculateBottleneckDays(
         Dictionary<string, decimal> hoursByPosition,
         Dictionary<string, decimal> positionCapacity)
@@ -133,10 +123,7 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, C
         return maxDays;
     }
 
-    /// <summary>
-    /// Hodiny nové zakázky seskupené podle pozice z LaborBomů.
-    /// Pokud produkt nemá LaborBomy, použijeme zálohu jako "Obecná výroba".
-    /// </summary>
+    // Seskupí potřebné hodiny zakázky podle výrobní pozice z kusovníku.
     private static Dictionary<string, decimal> CalculateHoursByPosition(
         IEnumerable<OrderItem> orderItems,
         Dictionary<int, Product> products)
@@ -159,7 +146,6 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, C
             }
             else
             {
-                // Záloha pro produkty bez LaborBomů
                 var fallbackHours = product.ProductionDays * FallbackHoursPerUnit * item.Quantity;
                 hoursByPosition["Obecná výroba"] =
                     hoursByPosition.GetValueOrDefault("Obecná výroba") + fallbackHours;
@@ -169,9 +155,7 @@ public class ConfirmOrderCommandHandler : IRequestHandler<ConfirmOrderCommand, C
         return hoursByPosition;
     }
 
-    /// <summary>
-    /// Sečte hodiny všech zakázek InProduction (kromě aktuální) per pozice.
-    /// </summary>
+    // Načte aktuální vytížení výroby ze všech potvrzených zakázek.
     private async Task<Dictionary<string, decimal>> CalculateBacklogByPositionAsync(
         int excludeOrderId,
         CancellationToken cancellationToken)

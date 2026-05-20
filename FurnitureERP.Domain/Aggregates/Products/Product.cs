@@ -19,7 +19,7 @@ public class Product : AggregateRoot
 
     public bool IsActive { get; private set; }
 
-    /// <summary>Počet pracovních dnů potřebných k výrobě jednoho kusu.</summary>
+    // Odhadovaná délka výroby jednoho kusu v pracovních dnech.
     public int ProductionDays { get; private set; }
 
     private readonly List<MaterialBom> _materialBoms = new();

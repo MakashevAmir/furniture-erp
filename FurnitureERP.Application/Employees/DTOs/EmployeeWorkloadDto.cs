@@ -24,6 +24,6 @@ public record EmployeeOrderAssignmentDto(
     DateTime? ExpectedCompletionDate
 )
 {
-    /// <summary>Справедливая доля часов с учётом пула сотрудников той же позиции.</summary>
+    // Přepočítaný podíl hodin zaměstnance z celkového poolu dané pozice.
     public decimal FairShareHours => PoolSize > 1 ? Math.Round(TotalHours / PoolSize, 1) : TotalHours;
 }

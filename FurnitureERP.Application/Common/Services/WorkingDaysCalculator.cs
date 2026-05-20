@@ -1,14 +1,8 @@
 namespace FurnitureERP.Application.Common.Services;
 
-/// <summary>
-/// Pomocná třída pro výpočty v pracovních dnech (pondělí–pátek).
-/// Dodávka materiálů probíhá každé pondělí.
-/// </summary>
 public static class WorkingDaysCalculator
 {
-    /// <summary>
-    /// Přidá zadaný počet pracovních dnů k datu (přeskočí soboty a neděle).
-    /// </summary>
+    // Posune datum o zadaný počet pracovních dnů a přeskočí víkendy.
     public static DateTime AddWorkingDays(DateTime start, int workingDays)
     {
         var date = start.Date;
@@ -22,12 +16,7 @@ public static class WorkingDaysCalculator
         return date;
     }
 
-    /// <summary>
-    /// Vrátí datum zahájení výroby při nedostatku materiálů.
-    /// Dodávky probíhají každé pondělí – výroba začne v pondělí.
-    /// Pokud je dnes pondělí, vrátí dnešní datum (dodávka přijde dnes).
-    /// Jinak vrátí nejbližší příští pondělí.
-    /// </summary>
+    // Vrátí nejbližší pondělí jako datum plánovaného dovozu materiálu.
     public static DateTime GetNextDeliveryMonday(DateTime from)
     {
         var date = from.Date;

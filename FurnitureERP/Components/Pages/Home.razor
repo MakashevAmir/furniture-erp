@@ -27,15 +27,15 @@
     {
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                <RadzenCard Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; height: 100%;">
-                    <RadzenStack Gap="0.5rem">
-                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                <RadzenCard Style="border-left: 4px solid #1976d2; height: 100%;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: #888; font-size: 0.75rem;">
                             Celkem objednávek
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: 700; color: #1976d2; margin: 0.25rem 0;">
                             @totalOrders
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: #aaa;">
                             Za posledních 30 dní
                         </RadzenText>
                     </RadzenStack>
@@ -43,15 +43,15 @@
             </RadzenColumn>
 
             <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                <RadzenCard Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; height: 100%;">
-                    <RadzenStack Gap="0.5rem">
-                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                <RadzenCard Style="border-left: 4px solid #fb8c00; height: 100%;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: #888; font-size: 0.75rem;">
                             Aktivní objednávky
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: 700; color: #fb8c00; margin: 0.25rem 0;">
                             @activeOrders
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: #aaa;">
                             Čekající a ve výrobě
                         </RadzenText>
                     </RadzenStack>
@@ -59,15 +59,15 @@
             </RadzenColumn>
 
             <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                <RadzenCard Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; height: 100%;">
-                    <RadzenStack Gap="0.5rem">
-                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                <RadzenCard Style="border-left: 4px solid #43a047; height: 100%;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: #888; font-size: 0.75rem;">
                             Tržby (30 dní)
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: 700; color: #43a047; margin: 0.25rem 0;">
                             @totalRevenue.ToString("N0") Kč
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: #aaa;">
                             Z @completedOrders dokončených
                         </RadzenText>
                     </RadzenStack>
@@ -75,15 +75,15 @@
             </RadzenColumn>
 
             <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                <RadzenCard Style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; height: 100%;">
-                    <RadzenStack Gap="0.5rem">
-                        <RadzenText TextStyle="TextStyle.Overline" Style="color: rgba(255,255,255,0.8);">
+                <RadzenCard Style="border-left: 4px solid #e53935; height: 100%;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenText TextStyle="TextStyle.Overline" Style="color: #888; font-size: 0.75rem;">
                             Nízké zásoby
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: bold;">
+                        <RadzenText TextStyle="TextStyle.H2" Style="font-weight: 700; color: #e53935; margin: 0.25rem 0;">
                             @lowStockCount
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" Style="color: rgba(255,255,255,0.9);">
+                        <RadzenText TextStyle="TextStyle.Body2" Style="color: #aaa;">
                             Materiálů pod minimem
                         </RadzenText>
                     </RadzenStack>

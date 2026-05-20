@@ -18,6 +18,9 @@ x86/
 **/packages/*
 !**/packages/build/
 
+# Claude Code
+.claude/
+
 # Rider
 .idea/
 
