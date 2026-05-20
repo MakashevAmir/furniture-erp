@@ -22,7 +22,7 @@
 
 4. Přihlaste se:
    - **Uživatel:** `admin`
-   - **Heslo:** `admin`
+   - **Heslo:** `Admin@1234`
 
 ## Databáze
 
